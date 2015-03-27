@@ -8,7 +8,8 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 	int bid= blockIdx.x;
 	int bDim=blockDim.x;
 	int gDim=gridDim.x;
-	int idxPyDoG = 0;
+	int idxPyDoG = idxImages*maskSize;
+	
 	for (int idxMask = 0; idxMask < maskSize; ++idxMask)
 	{
 		int iImg=0;
@@ -45,11 +46,16 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 						itImg+=images[idxImages].cols-mask[idxMask].cols;
 					}
 				}
+
 				PyDoG[idxPyDoG].image[iImg]=aux;
 				aux=0;
 			}
 		}
+
+		__syncthreads();
+		//printf("%i ",idxPyDoG );
 		++idxPyDoG;
+
 	}
 }
 
@@ -157,12 +163,13 @@ int PyramidDoG(Mat Image, vector<Mat> PyDoG){
 	cout<<cudaGetErrorString(e)<<" cudaMemCopyHD"<<endl;
 	////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Lanzo Kernel
-	//for (int i = 0; i < images.size(); ++i)
-	//{
-	int i=0;
-	ConvolutionDoG<<<32*32,1>>>(imgs_D,pkDoG_D,pyDoG_Out,i,PyKDoG.size());/////i es el indice de la imagen que se va a emborronar
-	//}
-	cout<< sizeof(ArrayImage)*images.size()*sizeof(ArrayImage)*PyKDoG.size() <<endl;
+	for (int i = 0; i < images.size(); ++i)
+	{
+		ConvolutionDoG<<<32*32,1>>>(imgs_D,pkDoG_D,pyDoG_Out,i,PyKDoG.size());/////i es el indice de la imagen que se va a emborrona
+		cudaDeviceSynchronize();
+		cout<<i<<endl;
+	}
+	//cout<< PyKDoG.size() <<endl;
 	
 	ArrayImage * img_out_test = new ArrayImage[sizeof(ArrayImage)*images.size()*sizeof(ArrayImage)*PyKDoG.size()];
 
