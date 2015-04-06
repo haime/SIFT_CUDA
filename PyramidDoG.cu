@@ -10,11 +10,15 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 	int gDim=gridDim.x;
 	int idxPyDoG = idxImages*maskSize;
 	
+	
 	for (int idxMask = 0; idxMask < maskSize; ++idxMask)
 	{
 		int iImg=0;
 		float aux=0;
-		int pxlThrd = ceil((double)(images[idxImages].cols*images[idxImages].rows)/gDim*bDim); 
+		int pxlThrd = ceil((double)(images[idxImages].cols*images[idxImages].rows)/(gDim*bDim)); 
+		
+		//if(tid==0)printf("%d pxlThrd \n", (images[idxImages].cols*images[idxImages].rows)/(gDim*bDim));
+		
 		for (int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
 		{
 			//////////////////////////////////////
@@ -22,6 +26,7 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 			iImg=(tid+(bDim*bid)) + (i*(gDim*bDim)); 
 			//////////////////////////////////////
 			//////////////////////////////////////
+			/*if(tid==0)*/printf(" %i ", iImg);
 			if(iImg > images[idxImages].cols*images[idxImages].rows){
 
 				int condition=mask[idxMask].cols/2+images[idxImages].cols;
@@ -31,8 +36,9 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 					iImg%images[idxImages].cols >=mask[idxMask].cols)					///condicion derecha
 				{
 					aux=0;
-				}else
-				{		
+					printf(" %i ", iImg);
+				}else{		
+					
 					int itMask = 0;
 					int itImg=iImg-condition;
 					for (int j = 0; j < mask[idxMask].rows; ++j)
@@ -45,15 +51,17 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 						}
 						itImg+=images[idxImages].cols-mask[idxMask].cols;
 					}
+					printf(" %i ", iImg);
 				}
-
-				PyDoG[idxPyDoG].image[iImg]=aux;
+				//if(tid==0)printf("%i pxlThrd \n", pxlThrd);
+				printf(" %i ", iImg);
+				PyDoG[idxPyDoG].image[iImg]=aux;//////////////////////////////
+				
 				aux=0;
 			}
 		}
 
 		__syncthreads();
-		//printf("%i ",idxPyDoG );
 		++idxPyDoG;
 
 	}
@@ -165,7 +173,7 @@ int PyramidDoG(Mat Image, vector<Mat> PyDoG){
 	/////////////////////////////////////////////////////////////////////Lanzo Kernel
 	for (int i = 0; i < images.size(); ++i)
 	{
-		ConvolutionDoG<<<32*32,1>>>(imgs_D,pkDoG_D,pyDoG_Out,i,PyKDoG.size());/////i es el indice de la imagen que se va a emborrona
+		ConvolutionDoG<<<4,32>>>(imgs_D,pkDoG_D,pyDoG_Out,i,PyKDoG.size());/////i es el indice de la imagen que se va a emborrona
 		cudaDeviceSynchronize();
 		cout<<i<<endl;
 	}
