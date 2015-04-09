@@ -26,12 +26,12 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 			iImg=(tid+(bDim*bid)) + (i*(gDim*bDim)); //// pixel en el que trabajara el hilo
 			//////////////////////////////////////
 			//////////////////////////////////////
-			
-			
 			if(iImg < images[idxImages].cols*images[idxImages].rows){
 				
-				int condition=mask[idxMask].cols/2+images[idxImages].cols;
-				 
+				int condition=mask[idxMask].cols/2+images[idxImages].cols*(floor((double)mask[idxMask].cols/2));
+				
+				
+
 				if (iImg-condition < 0  ||												///condicion arriba
 					iImg+condition > images[idxImages].cols*images[idxImages].rows ||	///condicion abajo
 					iImg%images[idxImages].cols < mask[idxMask].cols/2 ||				///condicion izquierda
@@ -43,6 +43,8 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 					
 					int itMask = 0;
 					int itImg=iImg-condition;
+
+					
 					for (int j = 0; j < mask[idxMask].rows; ++j)
 					{		
 						for (int h = 0; h < mask[idxMask].cols; ++h)
@@ -53,19 +55,16 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 						}
 						itImg+=images[idxImages].cols-mask[idxMask].cols;
 					}
-				
+					
+					aux=0;
 				}
-				//if(tid==0)printf("%i pxlThrd \n", pxlThrd);
-				if(tid==0)printf(" %i, ", idxPyDoG);
-				PyDoG[idxPyDoG].image[iImg]=aux;//////////////////////////////
 				
+				PyDoG[idxPyDoG].image[iImg]=aux;
 				aux=0;
+
 			}
 		}
-		if(tid==0)printf(" %i, ", idxPyDoG);
 		++idxPyDoG;
-		__syncthreads();
-		
 
 	}
 }
@@ -159,9 +158,11 @@ int PyramidDoG(Mat Image, vector<Mat> PyDoG){
 	ArrayImage * pyDoG_Out;
 	e=cudaMalloc(&imgs_D,sizeof(ArrayImage)*images.size());///imagenes
 	cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
-	
+	cout<<sizeof(ArrayImage)<<endl;
+
 	e=cudaMalloc(&pkDoG_D,sizeof(ArrayImage)*PyKDoG.size());//mascaras
 	cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
+	cout<<sizeof(ArrayImage)*PyKDoG.size()<<endl;
 
 	e=cudaMalloc(&pyDoG_Out,sizeof(ArrayImage)*images.size()*sizeof(ArrayImage)*PyKDoG.size());
 	cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
