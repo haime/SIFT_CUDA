@@ -15,18 +15,18 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 	{
 		int iImg=0;
 		float aux=0;
-		int pxlThrd = ceil((double)(images[idxImages].cols*images[idxImages].rows)/(gDim*bDim)); 
+		int pxlThrd = ceil((double)(images[idxImages].cols*images[idxImages].rows)/(gDim*bDim)); ////////numero de veces que caben
+																								 ////////los hilos en la imagen.
 		
-		//if(tid==0)printf("%d pxlThrd \n", (images[idxImages].cols*images[idxImages].rows)/(gDim*bDim));
-		
+	
 		for (int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
 		{
 			//////////////////////////////////////
 			//////////////////////////////////////Calculo de indices
-			iImg=(tid+(bDim*bid)) + (i*(gDim*bDim)); 
+			iImg=(tid+(bDim*bid)) + (i*(gDim*bDim)); //// pixel en el que trabajara el hilo
 			//////////////////////////////////////
 			//////////////////////////////////////
-			if(tid==0)printf(" %i, ", iImg);
+			
 			
 			if(iImg < images[idxImages].cols*images[idxImages].rows){
 				
@@ -56,15 +56,16 @@ __global__ void ConvolutionDoG(ArrayImage* images,ArrayImage* mask, ArrayImage* 
 				
 				}
 				//if(tid==0)printf("%i pxlThrd \n", pxlThrd);
-				if(tid==0)printf(" %i if", iImg);
+				if(tid==0)printf(" %i, ", idxPyDoG);
 				PyDoG[idxPyDoG].image[iImg]=aux;//////////////////////////////
 				
 				aux=0;
 			}
 		}
-
-		__syncthreads();
+		if(tid==0)printf(" %i, ", idxPyDoG);
 		++idxPyDoG;
+		__syncthreads();
+		
 
 	}
 }
