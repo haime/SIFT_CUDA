@@ -158,13 +158,13 @@ int PyramidDoG(Mat Image, vector<Mat> PyDoG){
 	ArrayImage * pyDoG_Out;
 	e=cudaMalloc(&imgs_D,sizeof(ArrayImage)*images.size());///imagenes
 	cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
-	cout<<sizeof(ArrayImage)<<endl;
+	
 
 	e=cudaMalloc(&pkDoG_D,sizeof(ArrayImage)*PyKDoG.size());//mascaras
 	cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
-	cout<<sizeof(ArrayImage)*PyKDoG.size()<<endl;
+	
 
-	e=cudaMalloc(&pyDoG_Out,sizeof(ArrayImage)*images.size()*sizeof(ArrayImage)*PyKDoG.size());
+	e=cudaMalloc(&pyDoG_Out,sizeof(ArrayImage)*images.size()*sizeof(ArrayImage) *PyKDoG.size());
 	cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
 
 	////////////////////////////////////////////////////////////////////////////////////////
