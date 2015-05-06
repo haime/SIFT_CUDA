@@ -3,7 +3,7 @@
 
 
 
-__global__ void Blur(float* image,float* mask, ArrayImage* PyDoG, int maskR,int maskC, int imgR,int imgC, float* imgOut, int idxPyDoG){
+__global__ void Blur(uchar* image,float* mask, ArrayImage* PyDoG, int maskR,int maskC, int imgR,int imgC, uchar* imgOut, int idxPyDoG){
 	int tid= threadIdx.x;
 	int bid= blockIdx.x;
 	int bDim=blockDim.x;
@@ -11,15 +11,18 @@ __global__ void Blur(float* image,float* mask, ArrayImage* PyDoG, int maskR,int 
 	
 		
 	int iImg=0;
-	float aux=0;
+	uchar aux=0;
 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
 														 ////////los hilos en la imagen.
 	
+	
+
 	for (int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
 	{
 		//////////////////////////////////////
 		//////////////////////////////////////Calculo de indices
-		iImg=(tid+(bDim*bid)) + (i*(gDim*bDim)); //// pixel en el que trabajara el hilo
+		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
+	
 		//////////////////////////////////////
 		//////////////////////////////////////
 		if(iImg < imgC*imgR){
@@ -31,6 +34,8 @@ __global__ void Blur(float* image,float* mask, ArrayImage* PyDoG, int maskR,int 
 			{
 				aux=0;
 				
+				
+				
 			}else{		
 				int itMask = 0;
 				int itImg=iImg-condition;
@@ -38,16 +43,23 @@ __global__ void Blur(float* image,float* mask, ArrayImage* PyDoG, int maskR,int 
 				{		
 					for (int h = 0; h < maskC; ++h)
 					{
-						aux+=image[itImg]*mask[idxMask].image[itMask];
+
+						aux+=image[itImg]*mask[itMask];
+						
 						++itMask;
 						++itImg;
+
 					}
 					itImg+=imgC-maskC;
 				}
 			}
+
+			
+
+
 			imgOut[iImg]=aux;
 
-			PyDoG[idxPyDoG].image=imgOut;
+			//PyDoG[idxPyDoG].image=imgOut;
 			PyDoG[idxPyDoG].cols=imgC;
 			PyDoG[idxPyDoG].rows=imgR;
 			aux=0;
@@ -136,7 +148,7 @@ int PyramidDoG(Mat Image, vector<Mat> PyDoG){
 	vector<Mat> images;
 	PyramidKDoG( PyKDoG,octvs,intvls);
 	ResizeImage(Image,images,octvs);
-
+	int idxPyDoG=0;
 	
 		
 	ArrayImage * pyDoG_Out;
@@ -147,47 +159,71 @@ int PyramidDoG(Mat Image, vector<Mat> PyDoG){
 	cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
 
 
-	for (int i = 0; i < images.size() ; ++i)
+	//for (int i = 0; i < images.size() ; ++i)
+	for (int i = 0; i < 1 ; ++i)
 	{
 		
-		float * img_D;
-		int sizeImage=images[i].rows*images[i].cols;
+		uchar * img_D;
+		int sizeImage = images[i].rows*images[i].cols;
+		
 		////////////////////////////////////////////////////////////////////////////////////////
 		/////////////////////////////////////////////////////////////////////Reservo Memoria GPU
-		e=cudaMalloc(&img_D,sizeof(float)*sizeImage);///imagenes
+		
+		e=cudaMalloc(&img_D,sizeof(uchar)*sizeImage);///imagenes
 		cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
-
+	
 		////////////////////////////////////////////////////////////////////////////////////////
 		/////////////////////////////////////////////////////////////////////Copio Memoria GPU
-		e=cudaMemcpy(img_D,images[i].ptr<float>(),sizeof(float)*sizeImage,cudaMemcpyHostToDevice);
+
+		e=cudaMemcpy(img_D,images[i].ptr<uchar>(),sizeof(uchar)*sizeImage,cudaMemcpyHostToDevice);
 		cout<<cudaGetErrorString(e)<<" cudaMemCopyHD"<<endl;
 
 		
-		for (int m = 0; m < PyKDoG.size(); ++i)
+		//for (int m = 0; m < PyKDoG.size(); ++i)
+		for (int m = 0; m < 1; ++m)
 		{
 			float * pkDoG_D;
-			int sizeMask=PyKDoG[j].rows*PyKDoG[j].cols;
+			uchar * out_D;
+			uchar * out= new uchar[sizeImage];
+			int sizeMask=PyKDoG[m].rows*PyKDoG[m].cols;
 
 			////////////////////////////////////////////////////////////////////////////////////////
 			/////////////////////////////////////////////////////////////////////Reservo Memoria GPU
 			e=cudaMalloc(&pkDoG_D,sizeof(float)*sizeMask);//mascaras
-			cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
-
+			cout<<cudaGetErrorString(e)<<" cudaMalloc________Mask "<<endl;
+			e=cudaMalloc(&out_D,sizeof(uchar)*sizeImage);
+			cout<<cudaGetErrorString(e)<<" cudaMalloc________Mask"<<endl;
 			////////////////////////////////////////////////////////////////////////////////////////
 			/////////////////////////////////////////////////////////////////////Copio Memoria GPU
-			e=cudaMemcpy(pkDoG_D,PyKDoG[j].ptr<float>(),sizeof(float)*sizeMask,cudaMemcpyHostToDevice);
-			cout<<cudaGetErrorString(e)<<" cudaMemCopyHD"<<endl;
+
+			e=cudaMemcpy(pkDoG_D,PyKDoG[m].ptr<float>(),sizeof(float)*sizeMask,cudaMemcpyHostToDevice);
+			cout<<cudaGetErrorString(e)<<" cudaMemCopyHD________Mask"<<endl;
 
 			////////////////////////////////////////////////////////////////////////////////////////
 			/////////////////////////////////////////////////////////////////////Lanzo Kernel
-			Blur<<<16,32>>>();
+			
+			Blur<<<8,32>>>(img_D,pkDoG_D,pyDoG_Out,PyKDoG[m].rows,PyKDoG[m].cols,images[i].rows,images[i].cols,out_D,idxPyDoG);
 			cudaDeviceSynchronize();
+			++idxPyDoG;
 			cudaFree(pkDoG_D); 
+			
+
+			e=cudaMemcpy(out,out_D,sizeof(uchar)*sizeImage,cudaMemcpyDeviceToHost);
+			cout<<cudaGetErrorString(e)<<" cudaMemCopyDH________Mask"<<endl;
+
+			Mat image_out(images[i].rows,images[i].cols,CV_8U,out);
+			cout<<image_out<<endl;
+			imshow("e",image_out);
+    		waitKey(0);
+    		destroyAllWindows();
+
+			delete(out);
+			cudaFree(out_D);
+
 		}
 		
-		e=cudaMemcpy(,,,cudaMemcpyDeviceToHost);
-		cout<<cudaGetErrorString(e)<<" cudaMemCopyDH"<<endl;
-		cudaFree(imgs_D);
+		
+		cudaFree(img_D);
 		
 
 	}
