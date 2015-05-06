@@ -14,7 +14,7 @@ int main()
 	Mat image= imread(TEST,CV_LOAD_IMAGE_GRAYSCALE);
 	vector<Mat> PyDoG;
 
-	PyramidDoG(image, PyDoG);
+	SiftFeatures(image, PyDoG);
 	imshow("test",image);
 	waitKey(0);
 	destroyAllWindows();
