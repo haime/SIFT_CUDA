@@ -14,23 +14,24 @@ __global__ void Blur(uchar* image,float* mask, ArrayImage* PyDoG, int maskR,int 
 	uchar aux=0;
 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
 														 ////////los hilos en la imagen.
-	
+
 	
 
-	for (int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+	//for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+	for(int i = 0; i <675; ++i)
 	{
 		//////////////////////////////////////
 		//////////////////////////////////////Calculo de indices
 		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
-	
+		printf("%i \n",iImg%imgC);
 		//////////////////////////////////////
 		//////////////////////////////////////
 		if(iImg < imgC*imgR){
 			int condition=maskC/2+imgC*(floor((double)maskC/2));
 			if (iImg-condition < 0  ||												///condicion arriba
-				iImg+condition > imgC*imgR ||	///condicion abajo
+				iImg+condition > imgC*imgR /*||	///condicion abajo
 				iImg%imgC < maskC/2 ||				///condicion izquierda
-				iImg%imgC >=maskC/2 )					///condicion derecha
+				//iImg%imgC >=maskC/2 */)					///condicion derecha
 			{
 				aux=0;
 				
@@ -45,7 +46,7 @@ __global__ void Blur(uchar* image,float* mask, ArrayImage* PyDoG, int maskR,int 
 					{
 
 						aux+=image[itImg]*mask[itMask];
-						
+						//printf("%i --- %i %i %i %i %i\n",iImg,i,tid,bDim,bid,gDim);		
 						++itMask;
 						++itImg;
 
@@ -212,7 +213,7 @@ int PyramidDoG(Mat Image, vector<Mat> PyDoG){
 			cout<<cudaGetErrorString(e)<<" cudaMemCopyDH________Mask"<<endl;
 
 			Mat image_out(images[i].rows,images[i].cols,CV_8U,out);
-			cout<<image_out<<endl;
+			//cout<<image_out<<endl;
 			imshow("e",image_out);
     		waitKey(0);
     		destroyAllWindows();
