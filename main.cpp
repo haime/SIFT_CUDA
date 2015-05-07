@@ -1,6 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
-#include <PyramidDoG.h>
+#include <SiftFeatures.h>
 #include <vector>
 
 using namespace cv;

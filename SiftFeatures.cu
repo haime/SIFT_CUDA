@@ -1,4 +1,4 @@
-#include <PyramidDoG.h>
+#include <SiftFeatures.h>
 
 
 
