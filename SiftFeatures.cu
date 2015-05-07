@@ -3,7 +3,7 @@
 
 
 
-__global__ void Blur(uchar* image,float* mask, ArrayImage* PyDoG, int maskR,int maskC, int imgR,int imgC, uchar* imgOut, int idxPyDoG){
+__global__ void Convolution(uchar* image,float* mask, ArrayImage* PyDoG, int maskR,int maskC, int imgR,int imgC, uchar* imgOut, int idxPyDoG){
 	int tid= threadIdx.x;
 	int bid= blockIdx.x;
 	int bDim=blockDim.x;
@@ -11,7 +11,7 @@ __global__ void Blur(uchar* image,float* mask, ArrayImage* PyDoG, int maskR,int 
 	
 		
 	int iImg=0;
-	uchar aux=0;
+	int aux=0;
 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
 														 ////////los hilos en la imagen.
 	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
@@ -45,7 +45,8 @@ __global__ void Blur(uchar* image,float* mask, ArrayImage* PyDoG, int maskR,int 
 					itImg+=imgC-maskC;
 				}
 			}
-			imgOut[iImg]=aux;
+			aux=(aux<0)?0:aux;
+			imgOut[iImg]=(aux>255)?255:aux;
 			PyDoG[idxPyDoG].image=imgOut;
 			PyDoG[idxPyDoG].cols=imgC;
 			PyDoG[idxPyDoG].rows=imgR;
@@ -78,14 +79,18 @@ int ResizeImage(Mat image,vector<Mat>& images, int octvs){
 int PyramidKDoG(vector<Mat> & PyKDoG, int octvs, int intvls){
 	vector<double> sig;
 	double sigma =1.6;
+	double s= sqrt(2);
+	
 	vector<Mat> PyGauss;
 	int size = 7;//size of gaussian mask
 	Mat mask=Mat::ones(size,size,CV_32F);
-	MaskGenerator(1.519868415,size,mask);
+	MaskGenerator(s,size,mask);
+
+	
 	//////////////////////////////////////////////////////////////////////Calculo de Sigmas
-	double k = pow( 2.0, 1.0 / intvls ); 
+	double k = pow( 2.0, 1.0 / 7); 
 	sig.push_back(sigma);
-	sigma=sigma * sqrt( k*k- 1 );
+	sigma=sigma * sqrt( k*k -1);
 	sig.push_back(sigma);
 	for (int i = 2; i < intvls + 3; i++){
 		sigma=sigma*k;
@@ -100,27 +105,34 @@ int PyramidKDoG(vector<Mat> & PyKDoG, int octvs, int intvls){
 		}
 		else{
 		   	GaussianBlur(PyGauss[i-1],aux,Size(0,0),sig[i]);
+		   	cout<<sig[i]<<endl;
+		   	//MaskGenerator(sig[i],size,mask);
+
 			PyGauss.push_back(aux);
 		}
 	}
+
 	///////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Resta de Gausianas
 	for(int i=0; i<intvls+2; ++i){
 		Mat aux=Mat::ones(size,size,CV_32F);
+		Mat aux1=Mat::zeros(size,size,CV_32F);
 		subtract(PyGauss[i+1],PyGauss[i],aux);
+		//subtract(PyGauss[i+1],aux1,aux);
+
 		PyKDoG.push_back(aux);
 	}
 	///////////////////////////////////////////////////////////////////////////////////////
 	return 0;
 }
 
-void VectorToPointer(vector<Mat> img, ArrayImage * pImg){
+/*void VectorToPointer(vector<Mat> img, ArrayImage * pImg){
 	for(int i=0; i<img.size(); ++i){
 		pImg[i].cols=img[i].cols;
 		pImg[i].rows=img[i].rows;
 		pImg[i].image=img[i].ptr<uchar>();
 	}
-}
+}*/
 
 int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	const int intvls = 3;
@@ -181,7 +193,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 			////////////////////////////////////////////////////////////////////////////////////////
 			/////////////////////////////////////////////////////////////////////Lanzo Kernel
 			
-			Blur<<<imgBlocks,1024>>>(img_D,pkDoG_D,pyDoG_Out,PyKDoG[m].rows,PyKDoG[m].cols,images[i].rows,images[i].cols,out_D,idxPyDoG);
+			Convolution<<<imgBlocks,1024>>>(img_D,pkDoG_D,pyDoG_Out,PyKDoG[m].rows,PyKDoG[m].cols,images[i].rows,images[i].cols,out_D,idxPyDoG);
 			cudaDeviceSynchronize();
 			++idxPyDoG;
 			cudaFree(pkDoG_D); 
