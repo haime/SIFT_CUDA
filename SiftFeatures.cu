@@ -78,17 +78,18 @@ int ResizeImage(Mat image,vector<Mat>& images, int octvs){
 
 int PyramidKDoG(vector<Mat> & PyKDoG, int octvs, int intvls){
 	vector<double> sig;
-	double sigma =1.6;
-	double s= sqrt(2);
+	double sigma =1;
+	double s= sqrt(2)/3;
 	
 	vector<Mat> PyGauss;
 	int size = 7;//size of gaussian mask
 	Mat mask=Mat::ones(size,size,CV_32F);
 	MaskGenerator(s,size,mask);
 
+	/*
 	
 	//////////////////////////////////////////////////////////////////////Calculo de Sigmas
-	double k = pow( 2.0, 1.0 / 7); 
+	double k = pow( 2.0, 1.0 / 6); 
 	sig.push_back(sigma);
 	sigma=sigma * sqrt( k*k -1);
 	sig.push_back(sigma);
@@ -102,23 +103,66 @@ int PyramidKDoG(vector<Mat> & PyKDoG, int octvs, int intvls){
 		Mat aux=Mat::ones(size,size,CV_32F);
 		if(i==0){
 			PyGauss.push_back(mask);
+			Mat aux1=Mat::zeros(896,896,CV_32F);
+		   	resize(mask,aux1,aux1.size());
+		   	imshow("e",aux1);
+    		waitKey(0);
+    		destroyAllWindows();
 		}
 		else{
-		   	GaussianBlur(PyGauss[i-1],aux,Size(0,0),sig[i]);
+		   	//GaussianBlur(PyGauss[i-1],aux,Size(0,0),sig[i]);
 		   	cout<<sig[i]<<endl;
-		   	//MaskGenerator(sig[i],size,mask);
+		   	MaskGenerator(s-sig[i],size,aux);
 
 			PyGauss.push_back(aux);
+
+			Mat aux1=Mat::zeros(896,896,CV_32F);
+		   	resize(aux,aux1,aux1.size());
+		   	imshow("e",aux1);
+    		waitKey(0);
+    		destroyAllWindows();
 		}
 	}
+
+	*/
+
+	for(int i=0; i<intvls+3; ++i){	
+		Mat aux=Mat::ones(size,size,CV_32F);
+		/*if(i==0){
+			PyGauss.push_back(mask);
+			Mat aux1=Mat::zeros(896,896,CV_32F);
+		   	resize(mask,aux1,aux1.size(),0,0,INTER_CUBIC);
+		   	imshow("e",aux1);
+    		waitKey(0);
+    		destroyAllWindows();
+		}
+		else{*/
+		   	//GaussianBlur(PyGauss[i-1],aux,Size(0,0),sig[i]);
+		   	//cout<<sig[i]<<endl;
+		   	MaskGenerator(s*0.11,size,aux);
+		   	cout<<s*0.11<<endl;
+		   	s*=0.11;
+			PyGauss.push_back(aux);
+
+			Mat aux1=Mat::zeros(896,896,CV_32F);
+		   	resize(aux,aux1,aux1.size(),0,0,INTER_CUBIC);
+		   	imshow("e",aux1);
+    		waitKey(0);
+    		destroyAllWindows();
+		//}
+	}
+
+
 
 	///////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Resta de Gausianas
 	for(int i=0; i<intvls+2; ++i){
+	//	for(int i=0; i<intvls+3; ++i){
 		Mat aux=Mat::ones(size,size,CV_32F);
 		Mat aux1=Mat::zeros(size,size,CV_32F);
 		subtract(PyGauss[i+1],PyGauss[i],aux);
-		//subtract(PyGauss[i+1],aux1,aux);
+		//subtract(PyGauss[i],aux1,aux);
+		
 
 		PyKDoG.push_back(aux);
 	}
@@ -204,7 +248,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 			Mat image_out(images[i].rows,images[i].cols,CV_8U,out);
 			
-			imshow("e",image_out);
+			imshow("e",image_out*100);
     		waitKey(0);
     		destroyAllWindows();
 
