@@ -15,12 +15,24 @@ using namespace std;
 
 
 
+
 struct ArrayImage
 {
 	int cols;
 	int rows;
-	uchar* image;
+	float* image;
 };
+
+struct MinMax
+{
+	int col;
+	int row;
+	int levelPy;
+	int idxArray;
+};
+
+
+
 
 int PyramidKDoG(vector<Mat> &PyKDoG, int octvs, int intvls);
 int SiftFeatures(Mat Image, vector<Mat> PyDoG);
