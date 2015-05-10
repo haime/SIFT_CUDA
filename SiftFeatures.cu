@@ -55,8 +55,8 @@ __global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int mas
 	}
 }
 
-
-__global__ void LocateMaxMin(ArrayImage* PyDoG, int sizePyDog, MinMax minMax )
+////////////////////arreglar   
+__global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , MinMax minMax )
 {
 	int tid= threadIdx.x;
 	int bid= blockIdx.x;
@@ -68,9 +68,12 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int sizePyDog, MinMax minMax )
 	float aux=0;
 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
 														 ////////los hilos en la imagen.
+	
 	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
 	
 	{
+		int min=0;
+		int max=0;
 		//////////////////////////////////////
 		//////////////////////////////////////Calculo de indices
 		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
@@ -78,33 +81,54 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int sizePyDog, MinMax minMax )
 		//////////////////////////////////////
 
 		if(iImg < imgC*imgR){
-			int condition=maskC/2+imgC*(floor((double)maskC/2));
-			if (iImg-condition < 0  ||										///condicion arriba
-				iImg+condition > imgC*imgR ||								///condicion abajo
-				iImg%imgC < maskC/2 ||										///condicion izquierda
-				iImg%imgC > (imgC-1)-(maskC/2) )							///condicion derecha
+			int condition=((maskC/2)+1)+imgC*(floor((double)maskC/2)+1);
+			if (!(iImg-condition < 0)  ||										///condicion arriba
+				!(iImg+condition > imgC*imgR) ||								///condicion abajo
+				!(iImg%imgC < ((maskC/2)+1)) ||										///condicion izquierda
+				!(iImg%imgC > (imgC-1)-((maskC/2)+1)))							///condicion derecha
 			{
-				aux=0;
-			}else{		
-				int itMask = 0;
-				int itImg=iImg-condition;
-				for (int j = 0; j < maskR; ++j)
-				{		
-					for (int h = 0; h < maskC; ++h)
-					{
-						aux+=image[itImg]*mask[itMask];
-						++itMask;
-						++itImg;
+				float value=PyDoG[idxPyDoG].image[iImg];
+				for (int m = -1; m < 1; ++m)
+				{
+					int itImg=iImg-condition;
+					for (int j = 0; j < 3; ++j)
+					{		
+						for (int h = 0; h < 3; ++h)
+						{
+							if(value<PyDoG[idxPyDoG+m].image[itImg])
+							{
+								++min;
+							}
+							else if(value>PyDoG[idxPyDoG+m].image[itImg])
+							{
+								++max
+							}
+
+							++itImg;
+						}
+						itImg+=imgC-3;
 					}
-					itImg+=imgC-maskC;
 				}
+/////////////////////////////////////////////////////////////////////////////////////////////////////Problema
+				if(min==26 || max==26)
+				{
+					/////Es Punto extremo;
+					imgOut[iImg]=1.0;
+
+
+				}else
+				{
+					imgOut[iImg]=0.0;
+				}
+
+				
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 			}
-			//aux=(aux<0)?0:aux;
-			imgOut[iImg]=aux;//(aux>255)?255:aux;
-			PyDoG[idxPyDoG].image=imgOut;
-			PyDoG[idxPyDoG].cols=imgC;
-			PyDoG[idxPyDoG].rows=imgR;
-			aux=0;
+		
+			
+		
 		}
 	}
 
