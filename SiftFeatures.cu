@@ -47,16 +47,14 @@ __global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int mas
 			}
 			//aux=(aux<0)?0:aux;
 			imgOut[iImg]=aux;//(aux>255)?255:aux;
-			PyDoG[idxPyDoG].image=imgOut;
-			PyDoG[idxPyDoG].cols=imgC;
-			PyDoG[idxPyDoG].rows=imgR;
 			aux=0;
 		}
 	}
+	PyDoG[idxPyDoG].image=imgOut;
 }
 
 ////////////////////arreglar   
-__global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , MinMax minMax )
+__global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,int maskC, int imgR,int imgC)
 {
 	int tid= threadIdx.x;
 	int bid= blockIdx.x;
@@ -65,7 +63,7 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , MinMax minMax )
 	
 		
 	int iImg=0;
-	float aux=0;
+	//float aux=0;
 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
 														 ////////los hilos en la imagen.
 	
@@ -79,15 +77,20 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , MinMax minMax )
 		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
 		//////////////////////////////////////
 		//////////////////////////////////////
-
+		
 		if(iImg < imgC*imgR){
-			int condition=((maskC/2)+1)+imgC*(floor((double)maskC/2)+1);
-			if (!(iImg-condition < 0)  ||										///condicion arriba
+			
+			//int condition=((maskC/2)+1)+imgC*(floor((double)maskC/2)+1);
+			imgOut[iImg]=0.5;//PyDoG[idxPyDoG].image[iImg];
+			float value=5;//PyDoG[idxPyDoG].image[iImg];
+			//printf("value : %f \n",value);
+			/*if (!(iImg-condition < 0)  ||										///condicion arriba
 				!(iImg+condition > imgC*imgR) ||								///condicion abajo
 				!(iImg%imgC < ((maskC/2)+1)) ||										///condicion izquierda
 				!(iImg%imgC > (imgC-1)-((maskC/2)+1)))							///condicion derecha
-			{
-				float value=PyDoG[idxPyDoG].image[iImg];
+			{ 
+				
+
 				for (int m = -1; m < 1; ++m)
 				{
 					int itImg=iImg-condition;
@@ -95,13 +98,16 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , MinMax minMax )
 					{		
 						for (int h = 0; h < 3; ++h)
 						{
+							
 							if(value<PyDoG[idxPyDoG+m].image[itImg])
 							{
 								++min;
+								//printf("%i min\n",min );
 							}
 							else if(value>PyDoG[idxPyDoG+m].image[itImg])
 							{
-								++max
+								++max;
+								//printf("%i max\n",max );
 							}
 
 							++itImg;
@@ -109,7 +115,7 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , MinMax minMax )
 						itImg+=imgC-3;
 					}
 				}
-/////////////////////////////////////////////////////////////////////////////////////////////////////Problema
+                 
 				if(min==26 || max==26)
 				{
 					/////Es Punto extremo;
@@ -118,22 +124,17 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , MinMax minMax )
 
 				}else
 				{
-					imgOut[iImg]=0.0;
+					imgOut[iImg]=0;
 				}
-
-				
-/////////////////////////////////////////////////////////////////////////////////////////////////////
+                
 
 
 			}
 		
-			
+			*/
 		
 		}
 	}
-
-
-
 }
 
 
@@ -142,7 +143,7 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , MinMax minMax )
 
 void MaskGenerator(double sigma, int size,Mat mask){//Generate Gaussian Kernel
 	Mat aux = getGaussianKernel(size,sigma,CV_32F);
-	Mat aux_t = Mat::zeros(size,size,CV_32F);
+	Mat aux_t;
 	transpose(aux,aux_t);
 	mask=aux*aux_t;
 }
@@ -199,16 +200,16 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	
 	
 	ArrayImage * pyDoG;
-	MinMax * minMax;
+	//MinMax * minMax;
 	int mMidx=1;
 	////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Reservo Memoria GPU
 	cudaMalloc(&pyDoG,sizeof(ArrayImage)*images.size()*sizeof(ArrayImage) *PyKDoG.size());
-	cudaMalloc(&minMax,sizeof(MinMax)/*No se tamaño del arreglo*/);
+	//cudaMalloc(&minMax,sizeof(MinMax)/*No se tamaño del arreglo*/);
 	//cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
 
-	for (int i = 0; i < images.size() ; ++i)
-	//for (int i = 0; i < 1 ; ++i)
+	//for (int i = 0; i < images.size() ; ++i)
+	for (int i = 0; i < 1 ; ++i)
 	{
 		
 		float * img_D;
@@ -231,8 +232,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 		////////////////////////////////////////////////////////////////////////////////////////
 		///////////////////////////////////////////////////////Convolucion de mascara con imagen
 		/////////////////////////////////////////////////////////////////////Una Octava or ciclo
-		for (int m = 0; m < PyKDoG.size(); ++m)
-		{
+		for (int m = 0; m < PyKDoG.size(); ++m){
 			float * pkDoG_D;
 			float * out_D;
 			float * out= new float[sizeImage];
@@ -259,14 +259,14 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 			cudaFree(pkDoG_D); 
 			
 
-			cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
+			/*cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
 			//cout<<cudaGetErrorString(e)<<" cudaMemCopyDH________Mask"<<endl;
 
 			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
 			
 			imshow("tesuto",image_out*5);
     		waitKey(0);
-    		destroyAllWindows();
+    		destroyAllWindows();*/
 
 			delete(out);
 			cudaFree(out_D);
@@ -279,8 +279,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 		////////////////////////////////////////////////////////////////////////////////////////
 		//////////////////////////////////////////////////////////////////////Busqueda de MinMax
 		/////////////////////////////////////////////////////////////////////Una Octava or ciclo
-		for (int m = mMidx; m < idxPyDoG-1; ++m)
-		{
+		for (int m = mMidx; m < idxPyDoG-1; ++m){
 			
 			float * out_D;
 			float * out= new float[sizeImage];
@@ -288,14 +287,11 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 			/////////////////////////////////////////////////////////////////////Reservo Memoria GPU
 			cudaMalloc(&out_D,sizeof(float)*sizeImage);
 			//cout<<cudaGetErrorString(e)<<" cudaMalloc________Mask"<<endl;
-			////////////////////////////////////////////////////////////////////////////////////////
-			/////////////////////////////////////////////////////////////////////Copio Memoria GPU
-
-			
+						
 			////////////////////////////////////////////////////////////////////////////////////////
 			/////////////////////////////////////////////////////////////////////Lanzo Kernel
 			
-			LocateMaxMin<<<imgBlocks,1024>>>();
+			LocateMaxMin<<<imgBlocks,1024>>>(pyDoG,mMidx,out_D,PyKDoG[m].cols,images[i].rows,images[i].cols);
 			cudaDeviceSynchronize();
 						
 
@@ -304,7 +300,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
 			
-			imshow("tesuto",image_out*5);
+			imshow("tesuto",image_out);
     		waitKey(0);
     		destroyAllWindows();
 
@@ -318,7 +314,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 	}
 	cudaFree(pyDoG);
-	cout<<idxPyDoG<<endl;
+
 
 
 	return 0;

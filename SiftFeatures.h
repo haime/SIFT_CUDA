@@ -18,8 +18,6 @@ using namespace std;
 
 struct ArrayImage
 {
-	int cols;
-	int rows;
 	float* image;
 };
 
