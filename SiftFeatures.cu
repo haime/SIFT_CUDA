@@ -15,7 +15,6 @@ __global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int mas
 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
 														 ////////los hilos en la imagen.
 	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
-	
 	{
 		//////////////////////////////////////
 		//////////////////////////////////////Calculo de indices
@@ -30,7 +29,7 @@ __global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int mas
 				iImg%imgC < maskC/2 ||										///condicion izquierda
 				iImg%imgC > (imgC-1)-(maskC/2) )							///condicion derecha
 			{
-				aux=0;
+				aux=0;;
 			}else{		
 				int itMask = 0;
 				int itImg=iImg-condition;
@@ -63,15 +62,16 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 	
 		
 	int iImg=0;
-	//float aux=0;
 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
 														 ////////los hilos en la imagen.
-	
+
 	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
 	
 	{
 		int min=0;
 		int max=0;
+		float value=0.0;
+		float compare =0.0;
 		//////////////////////////////////////
 		//////////////////////////////////////Calculo de indices
 		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
@@ -80,16 +80,17 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 		
 		if(iImg < imgC*imgR){
 			
-			//int condition=((maskC/2)+1)+imgC*(floor((double)maskC/2)+1);
-			imgOut[iImg]=0.5;//PyDoG[idxPyDoG].image[iImg];
-			float value=5;//PyDoG[idxPyDoG].image[iImg];
-			//printf("value : %f \n",value);
-			/*if (!(iImg-condition < 0)  ||										///condicion arriba
-				!(iImg+condition > imgC*imgR) ||								///condicion abajo
-				!(iImg%imgC < ((maskC/2)+1)) ||										///condicion izquierda
-				!(iImg%imgC > (imgC-1)-((maskC/2)+1)))							///condicion derecha
-			{ 
-				
+
+			int condition=(maskC/2)+imgC*(floor((double)maskC/2));
+			if (iImg-condition < 0  ||										///condicion arriba
+				iImg+condition > imgC*imgR ||								///condicion abajo
+				iImg%imgC < maskC/2 ||										///condicion izquierda
+				iImg%imgC > (imgC-1)-(maskC/2) )							///condicion derecha
+			{
+				imgOut[iImg]=0.5;				
+			}
+			else{
+
 
 				for (int m = -1; m < 1; ++m)
 				{
@@ -98,23 +99,27 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 					{		
 						for (int h = 0; h < 3; ++h)
 						{
-							
-							if(value<PyDoG[idxPyDoG+m].image[itImg])
+							value=PyDoG[idxPyDoG].image[iImg];
+							compare =PyDoG[idxPyDoG+m].image[itImg];
+							/*if(value<compare)
 							{
 								++min;
-								//printf("%i min\n",min );
+								printf("%i min\n",min );
 							}
-							else if(value>PyDoG[idxPyDoG+m].image[itImg])
+							else if(value>compare)
 							{
 								++max;
-								//printf("%i max\n",max );
-							}
-
+								printf("%i max\n",max );
+							}*/
+							
 							++itImg;
 						}
 						itImg+=imgC-3;
 					}
 				}
+
+				//imgOut[iImg]=1.0;
+
                  
 				if(min==26 || max==26)
 				{
@@ -126,13 +131,8 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 				{
 					imgOut[iImg]=0;
 				}
-                
-
-
-			}
-		
-			*/
-		
+				
+            }
 		}
 	}
 }
@@ -269,7 +269,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
     		destroyAllWindows();*/
 
 			delete(out);
-			cudaFree(out_D);
+			//cudaFree(out_D);
 		}
 		cudaFree(img_D);
 		////////////////////////////////////////////////////////////////////////////////////////
@@ -305,7 +305,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
     		destroyAllWindows();
 
 			delete(out);
-			cudaFree(out_D);
+			//cudaFree(out_D);
 		}
 		mMidx=idxPyDoG+1;
 		////////////////////////////////////////////////////////////////////////////////////////
