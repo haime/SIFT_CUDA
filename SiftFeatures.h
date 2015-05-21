@@ -37,3 +37,4 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG);
 void MaskGenerator(double sigma, int size,Mat mask);
 int ResizeImage(Mat image,vector<Mat>& images, int octvs);
 void VectorToPointer(vector<Mat> img, ArrayImage * pImg);
+int foundIndexesMaxMin(vector<Mat> minMax,vector<int*> & idxMinMax);

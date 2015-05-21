@@ -184,6 +184,31 @@ int PyramidKDoG(vector<Mat> & PyKDoG, int octvs, int intvls){
 	return 0;
 }
 
+int foundIndexesMaxMin(float* minMax,vector<int*> & idxMinMax, int count )
+{
+	vector<int> idxmM;
+
+	for (int c = 0; c <  count; ++c)
+	{
+		
+		if (minMax[c]==0.0)
+		{
+			idxmM.push_back(c);
+			cout<<c<<endl;
+		}
+	
+	}
+	
+
+	idxMinMax.push_back(idxmM.data());
+	
+
+	return 0;
+}
+
+
+
+
 int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	const int intvls = 2;
 	int octvs;
@@ -191,6 +216,9 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	octvs = log( min( Image.rows, Image.cols ) ) / log(2) - 2;
 	vector<Mat> PyKDoG;
 	vector<Mat> images;
+	vector<Mat> minMax;
+	vector<int*>idxMinMax;
+
 	PyramidKDoG( PyKDoG,octvs,intvls);
 	ResizeImage(Image,images,octvs);
 	int idxPyDoG=0;
@@ -231,7 +259,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 		for (int m = 0; m < PyKDoG.size(); ++m){
 			float * pkDoG_D;
 			float * out_D;
-			float * out= new float[sizeImage];
+			//float * out= new float[sizeImage];
 			int sizeMask=PyKDoG[m].rows*PyKDoG[m].cols;
 
 			////////////////////////////////////////////////////////////////////////////////////////
@@ -264,7 +292,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
     		waitKey(0);
     		destroyAllWindows();
 			*/
-			delete(out);
+			//delete(out);
 			//cudaFree(out_D);
 		}
 		cudaFree(img_D);
@@ -304,12 +332,17 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
 			
-			imshow("tesuto",image_out);
+			foundIndexesMaxMin(out,idxMinMax,images[i].rows*images[i].cols);
+			
+    		//minMax.push_back(image_out);
+
+    		imshow("tesuto",image_out);
     		waitKey(0);
     		destroyAllWindows();
 
+			
 			delete(out);
-			//cudaFree(out_D);
+			cudaFree(out_D);
 			
 		}
 		mMidx=m+2;
@@ -318,10 +351,8 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 		////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////////
 	}
-
-
-
-
+	
+	
 
 	cudaFree(pyDoG);
 
