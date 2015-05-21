@@ -29,7 +29,7 @@ __global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int mas
 				iImg%imgC < maskC/2 ||										///condicion izquierda
 				iImg%imgC > (imgC-1)-(maskC/2) )							///condicion derecha
 			{
-				aux=0;;
+				aux=-1;
 			}else{		
 				int itMask = 0;
 				int itImg=iImg-condition;
@@ -52,7 +52,7 @@ __global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int mas
 	PyDoG[idxPyDoG].image=imgOut;
 }
 
-  
+///////entrega ya los puntos descartanbdo los de bajo contraste
 __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,int maskC, int imgR,int imgC)
 {
 	int tid= threadIdx.x;
@@ -86,11 +86,11 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 				iImg+condition > imgC*imgR ||								///condicion abajo
 				iImg%imgC < maskC/2 ||										///condicion izquierda
 				iImg%imgC > (imgC-1)-(maskC/2) )							///condicion derecha
-			{
+			{                  
 				imgOut[iImg]=0.5;				
 			}
 			else{
-				imgOut[iImg]=1.0;
+				
 				value=PyDoG[idxPyDoG].image[iImg];
 				
 				for (int m = -1; m < 2; ++m)
@@ -116,7 +116,7 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 					}
 				}
   				//printf("%i %i\n",min,max );
-				if(min==26){
+				if(min==26 && value>0.3){
 					/////Es Punto extremo;
 					 imgOut[iImg]=0.0;
 				}else if(max==26){
@@ -273,14 +273,17 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 		////////////////////////////////////////////////////////////////////////////////////////
 	}
 
-	for (int i = 0; i <2 ; ++i)
+	int maskC =PyKDoG[0].cols;
+	for (int i = 0; i <images.size() ; ++i)
 	{
 		int sizeImage = images[i].rows*images[i].cols;
 		int imgBlocks= ceil((double) images[i].cols/BW);
 		////////////////////////////////////////////////////////////////////////////////////////
 		//////////////////////////////////////////////////////////////////////Busqueda de MinMax
 		/////////////////////////////////////////////////////////////////////Una Octava or ciclo
-		for(int m = mMidx; m < PyKDoG.size()-1; ++m){
+		
+		int m=0;
+		for(m = mMidx; m < mMidx+intvls; ++m){
 			
 			float * out_D;
 			float * out= new float[sizeImage];
@@ -291,11 +294,10 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 						
 			////////////////////////////////////////////////////////////////////////////////////////
 			/////////////////////////////////////////////////////////////////////Lanzo Kernel
-			cout<<m<<endl;
-			LocateMaxMin<<<imgBlocks,1024>>>(pyDoG,m,out_D,PyKDoG[m].cols,images[i].rows,images[i].cols);
-			//LocateMaxMin<<<1,1>>>(pyDoG,mMidx,out_D,PyKDoG[m].cols,images[i].rows,images[i].cols);
+			///////entrega ya los puntos descartanbdo los de bajo contraste
+			LocateMaxMin<<<imgBlocks,1024>>>(pyDoG,m,out_D,maskC,images[i].rows,images[i].cols);
 			cudaDeviceSynchronize();
-						
+					
 
 			cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
 			//cout<<cudaGetErrorString(e)<<" cudaMemCopyDH________Mask"<<endl;
@@ -308,8 +310,10 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 			delete(out);
 			//cudaFree(out_D);
+			
 		}
-		mMidx+=3;
+		mMidx=m+2;
+		
 		////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////////
@@ -325,3 +329,52 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 	return 0;
 }
+
+
+
+
+/*
+
+/*
+  Determines whether a feature is too edge like to be stable by computing the
+  ratio of principal curvatures at that feature.  Based on Section 4.1 of
+  Lowe's paper.
+
+  @param dog_img image from the DoG pyramid in which feature was detected
+  @param r feature row
+  @param c feature col
+  @param curv_thr high threshold on ratio of principal curvatures
+
+  @return Returns 0 if the feature at (r,c) in dog_img is sufficiently
+    corner-like or 1 otherwise.
+//
+
+
+
+static int is_too_edge_like( IplImage* dog_img, int r, int c, int curv_thr )
+{
+  double d, dxx, dyy, dxy, tr, det;
+
+  /* principal curvatures are computed using the trace and det of Hessian 
+  d = pixval32f(dog_img, r, c);
+  dxx = pixval32f( dog_img, r, c+1 ) + pixval32f( dog_img, r, c-1 ) - 2 * d;
+  dyy = pixval32f( dog_img, r+1, c ) + pixval32f( dog_img, r-1, c ) - 2 * d;
+  dxy = ( pixval32f(dog_img, r+1, c+1) - pixval32f(dog_img, r+1, c-1) -
+	  pixval32f(dog_img, r-1, c+1) + pixval32f(dog_img, r-1, c-1) ) / 4.0;
+  tr = dxx + dyy;
+  det = dxx * dyy - dxy * dxy;
+
+  /* negative determinant -> curvatures have different signs; reject feature 
+  if( det <= 0 )
+    return 1;
+
+  if( tr * tr / det < ( curv_thr + 1.0 )*( curv_thr + 1.0 ) / curv_thr )
+    return 0;
+  return 1;
+}
+
+
+
+
+
+*/
