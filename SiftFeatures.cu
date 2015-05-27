@@ -87,7 +87,7 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 				iImg%imgC < maskC/2 ||										///condicion izquierda
 				iImg%imgC > (imgC-1)-(maskC/2) )							///condicion derecha
 			{                  
-				imgOut[iImg]=0.5;				
+				imgOut[iImg]=0.0;				
 			}
 			else{
 				
@@ -118,12 +118,12 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
   				//printf("%i %i\n",min,max );
 				if(min==26 && value>0.3){
 					/////Es Punto extremo;
-					 imgOut[iImg]=0.0;
+					 imgOut[iImg]=1.0;
 				}else if(max==26){
 					/////Es Punto extremo;
-					 imgOut[iImg]=0.0;
+					 imgOut[iImg]=1.0;
 				}else{
-					imgOut[iImg]=1.0;
+					imgOut[iImg]=0.0;
 				}
 			
             }
@@ -132,6 +132,58 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 }
 
 
+
+__global__ void scan(float * points , int * sum , int * sum_,  MinMax * idxMinMax , int * length)
+{
+	int tid= threadIdx.x;
+	int bid= blockIdx.x;
+	int bDim=blockDim.x;
+	int gDim=gridDim.x;
+	int aux=1;
+		
+	int iImg=0;
+	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
+														 ////////los hilos en la imagen.
+
+	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+	
+	{
+		
+		//////////////////////////////////////
+		//////////////////////////////////////Calculo de indices
+		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
+		//////////////////////////////////////
+		//////////////////////////////////////
+		
+		if(iImg < imgC*imgR){
+
+			sum[iImg]=points[iImg];
+		}
+
+	}
+
+
+	Falta ciclo para aplicar las veces necesarias para tener todos los indices
+	while(aux<length){
+		for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+		{
+			//////////////////////////////////////
+			//////////////////////////////////////Calculo de indices
+			iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
+			//////////////////////////////////////
+			//////////////////////////////////////
+			if(iImg < imgC*imgR){
+				if(aux%2 == 1)
+					sum_[iImg]=(iImg>aux-1)?sum[iImg]+sum[iImg-aux]:sum[iImg];
+				else
+					sum[iImg]=(iImg>aux-1)?sum_[iImg]+sum_[iImg-aux]:sum_[iImg];
+			}
+		}
+		aux*=2;
+	}
+
+
+}
 
 
 
@@ -194,7 +246,7 @@ int foundIndexesMaxMin(float* minMax,vector<int*> & idxMinMax, int count )
 		if (minMax[c]==0.0)
 		{
 			idxmM.push_back(c);
-			cout<<c<<endl;
+			//cout<<c<<endl;
 		}
 	
 	}
@@ -217,7 +269,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	vector<Mat> PyKDoG;
 	vector<Mat> images;
 	vector<Mat> minMax;
-	vector<int*>idxMinMax;
+	//vector<int*>idxMinMax;
 
 	PyramidKDoG( PyKDoG,octvs,intvls);
 	ResizeImage(Image,images,octvs);
@@ -225,7 +277,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	
 	
 	ArrayImage * pyDoG;
-	//MinMax * minMax;
+	MinMax * idxminMax;
 	int mMidx=1;
 	////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Reservo Memoria GPU
@@ -278,7 +330,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 			/////////////////////////////////////////////////////////////////////Lanzo Kernel
 			
 			Convolution<<<imgBlocks,1024>>>(img_D,pkDoG_D,pyDoG,PyKDoG[m].rows,PyKDoG[m].cols,images[i].rows,images[i].cols,out_D,idxPyDoG);
-			cudaDeviceSynchronize();
+			//cudaDeviceSynchronize();
 			++idxPyDoG;
 			cudaFree(pkDoG_D); 
 			
@@ -324,7 +376,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 			/////////////////////////////////////////////////////////////////////Lanzo Kernel
 			///////entrega ya los puntos descartanbdo los de bajo contraste
 			LocateMaxMin<<<imgBlocks,1024>>>(pyDoG,m,out_D,maskC,images[i].rows,images[i].cols);
-			cudaDeviceSynchronize();
+			//cudaDeviceSynchronize();
 					
 
 			cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
@@ -332,10 +384,9 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
 			
-			foundIndexesMaxMin(out,idxMinMax,images[i].rows*images[i].cols);
 			
-    		//minMax.push_back(image_out);
-
+			
+    		
     		imshow("tesuto",image_out);
     		waitKey(0);
     		destroyAllWindows();

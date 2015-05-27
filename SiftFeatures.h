@@ -23,10 +23,7 @@ struct ArrayImage
 
 struct MinMax
 {
-	int col;
-	int row;
-	int levelPy;
-	int idxArray;
+	int * idxMinMax;
 };
 
 
