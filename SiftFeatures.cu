@@ -29,7 +29,7 @@ __global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int mas
 				iImg%imgC < maskC/2 ||										///condicion izquierda
 				iImg%imgC > (imgC-1)-(maskC/2) )							///condicion derecha
 			{
-				aux=-1;
+				aux=0;
 			}else{		
 				int itMask = 0;
 				int itImg=iImg-condition;
@@ -44,15 +44,15 @@ __global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int mas
 					itImg+=imgC-maskC;
 				}
 			}
-			//aux=(aux<0)?0:aux;
-			imgOut[iImg]=aux;//(aux>255)?255:aux;
+			aux=(aux<0)?0:aux;
+			aux*=7;
+			imgOut[iImg]=(aux>1.0)?1:aux;
 			aux=0;
 		}
 	}
 	PyDoG[idxPyDoG].image=imgOut;
 }
 
-///////entrega ya los puntos descartanbdo los de bajo contraste
 __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,int maskC, int imgR,int imgC)
 {
 	int tid= threadIdx.x;
@@ -60,7 +60,8 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 	int bDim=blockDim.x;
 	int gDim=gridDim.x;
 	
-		
+	float dxx,dyy,dxy, tr, det;
+
 	int iImg=0;
 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
 														 ////////los hilos en la imagen.
@@ -102,11 +103,11 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 						for (int h = 0; h < 3; ++h)
 						{
 							compare =PyDoG[idxPyDoG+m].image[itImg];
-							if(value<compare && max==0)
+							if(value<=compare && max==0)
 							{
 								++min;
 							}
-							else if(value>compare && min==0)
+							else if(value>=compare && min==0)
 							{
 								++max;
 							}
@@ -116,12 +117,26 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 					}
 				}
   				//printf("%i %i\n",min,max );
-				if(min==26 && value>0.3){
-					/////Es Punto extremo;
-					 imgOut[iImg]=1.0;
-				}else if(max==26){
-					/////Es Punto extremo;
-					 imgOut[iImg]=1.0;
+				if( (min==26 || max==26) && value>0.3) {
+					
+					dxx=PyDoG[idxPyDoG].image[iImg+1]+PyDoG[idxPyDoG].image[iImg-1]-2*value;
+					dyy=PyDoG[idxPyDoG].image[iImg+imgC]+PyDoG[idxPyDoG].image[iImg-imgC]-2*value;
+					dxy=(PyDoG[idxPyDoG].image[iImg+imgC+1]-PyDoG[idxPyDoG].image[iImg+imgC-1]-PyDoG[idxPyDoG].image[iImg-imgC+1] + PyDoG[idxPyDoG].image[iImg-imgC-1])/4.0;
+					tr = dxx+dyy;
+					det = dxx*dyy - dxy*dxy;
+					
+					
+
+					if( 1/*det > 0   &&  (tr*tr/det) < 8.1*/  ){
+						imgOut[iImg]=1.0; /////Es Punto extremo;
+					}else{
+						imgOut[iImg]=0.0;
+					}
+
+
+
+					
+					
 				}else{
 					imgOut[iImg]=0.0;
 				}
@@ -130,64 +145,6 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,i
 		}
 	}
 }
-
-
-
-__global__ void scan(float * points , int * sum , int * sum_,  MinMax * idxMinMax , int * length)
-{
-	int tid= threadIdx.x;
-	int bid= blockIdx.x;
-	int bDim=blockDim.x;
-	int gDim=gridDim.x;
-	int aux=1;
-		
-	int iImg=0;
-	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
-														 ////////los hilos en la imagen.
-
-	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
-	
-	{
-		
-		//////////////////////////////////////
-		//////////////////////////////////////Calculo de indices
-		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
-		//////////////////////////////////////
-		//////////////////////////////////////
-		
-		if(iImg < imgC*imgR){
-
-			sum[iImg]=points[iImg];
-		}
-
-	}
-
-
-	Falta ciclo para aplicar las veces necesarias para tener todos los indices
-	while(aux<length){
-		for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
-		{
-			//////////////////////////////////////
-			//////////////////////////////////////Calculo de indices
-			iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
-			//////////////////////////////////////
-			//////////////////////////////////////
-			if(iImg < imgC*imgR){
-				if(aux%2 == 1)
-					sum_[iImg]=(iImg>aux-1)?sum[iImg]+sum[iImg-aux]:sum[iImg];
-				else
-					sum[iImg]=(iImg>aux-1)?sum_[iImg]+sum_[iImg-aux]:sum_[iImg];
-			}
-		}
-		aux*=2;
-	}
-
-
-}
-
-
-
-
 
 
 void MaskGenerator(double sigma, int size,Mat mask){//Generate Gaussian Kernel
@@ -269,7 +226,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	vector<Mat> PyKDoG;
 	vector<Mat> images;
 	vector<Mat> minMax;
-	//vector<int*>idxMinMax;
+	vector<int*>idxMinMax;
 
 	PyramidKDoG( PyKDoG,octvs,intvls);
 	ResizeImage(Image,images,octvs);
@@ -277,7 +234,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	
 	
 	ArrayImage * pyDoG;
-	MinMax * idxminMax;
+	//MinMax * idxminMax;
 	int mMidx=1;
 	////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Reservo Memoria GPU
@@ -334,16 +291,16 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 			++idxPyDoG;
 			cudaFree(pkDoG_D); 
 			
-		/*	
-			cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
+			
+			//cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
 			//cout<<cudaGetErrorString(e)<<" cudaMemCopyDH________Mask"<<endl;
 
-			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
+			//Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
+			//if (i == images.size()-1)cout<<image_out<<endl;
+			//imshow("tesuto",image_out);
+    		//waitKey(0);
+    		//destroyAllWindows();
 			
-			imshow("tesuto",image_out*5);
-    		waitKey(0);
-    		destroyAllWindows();
-			*/
 			//delete(out);
 			//cudaFree(out_D);
 		}
@@ -381,10 +338,10 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 			cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
 			//cout<<cudaGetErrorString(e)<<" cudaMemCopyDH________Mask"<<endl;
-
+			
 			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
 			
-			
+			//foundIndexesMaxMin(out,idxMinMax, int count )
 			
     		
     		imshow("tesuto",image_out);
@@ -415,48 +372,3 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 
 
-/*
-
-/*
-  Determines whether a feature is too edge like to be stable by computing the
-  ratio of principal curvatures at that feature.  Based on Section 4.1 of
-  Lowe's paper.
-
-  @param dog_img image from the DoG pyramid in which feature was detected
-  @param r feature row
-  @param c feature col
-  @param curv_thr high threshold on ratio of principal curvatures
-
-  @return Returns 0 if the feature at (r,c) in dog_img is sufficiently
-    corner-like or 1 otherwise.
-//
-
-
-
-static int is_too_edge_like( IplImage* dog_img, int r, int c, int curv_thr )
-{
-  double d, dxx, dyy, dxy, tr, det;
-
-  /* principal curvatures are computed using the trace and det of Hessian 
-  d = pixval32f(dog_img, r, c);
-  dxx = pixval32f( dog_img, r, c+1 ) + pixval32f( dog_img, r, c-1 ) - 2 * d;
-  dyy = pixval32f( dog_img, r+1, c ) + pixval32f( dog_img, r-1, c ) - 2 * d;
-  dxy = ( pixval32f(dog_img, r+1, c+1) - pixval32f(dog_img, r+1, c-1) -
-	  pixval32f(dog_img, r-1, c+1) + pixval32f(dog_img, r-1, c-1) ) / 4.0;
-  tr = dxx + dyy;
-  det = dxx * dyy - dxy * dxy;
-
-  /* negative determinant -> curvatures have different signs; reject feature 
-  if( det <= 0 )
-    return 1;
-
-  if( tr * tr / det < ( curv_thr + 1.0 )*( curv_thr + 1.0 ) / curv_thr )
-    return 0;
-  return 1;
-}
-
-
-
-
-
-*/
