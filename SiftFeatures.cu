@@ -50,10 +50,10 @@ __global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int mas
 			aux=0;
 		}
 	}
-	if(iImg==0)PyDoG[idxPyDoG].image=imgOut;
+	PyDoG[idxPyDoG].image=imgOut;
 }
 
-__global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , char * imgOut ,MinMax * mM, int maskC, int imgR,int imgC, int idxmM)
+__global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,MinMax * mM, int maskC, int imgR,int imgC, int idxmM)
 {
 	int tid= threadIdx.x;
 	int bid= blockIdx.x;
@@ -124,9 +124,67 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , char * imgOut ,Mi
             }
 		}
 	}
-	if(iImg==0)mM[idxmM].minMax=imgOut;
+	mM[idxmM].minMax=imgOut;
 }
 
+
+__global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idxPyDoG, int imgR,int imgC, float * aux)
+{
+	int tid= threadIdx.x;
+	int bid= blockIdx.x;
+	int bDim=blockDim.x;
+	int gDim=gridDim.x;
+	
+		
+	int iImg=0;
+	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
+														 ////////los hilos en la imagen.
+	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+	{
+		//////////////////////////////////////
+		//////////////////////////////////////Calculo de indices
+		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
+		//////////////////////////////////////
+		//////////////////////////////////////
+		
+		if(iImg < imgC*imgR){
+			aux[iImg]= mM[idxmM].minMax[iImg];
+			
+
+			if(mM[idxmM].minMax[iImg]>0 && PyDoG[idxPyDoG].image[iImg]>0.02)
+			{
+				
+				float d, dxx, dyy, dxy, tr, det;
+				d = PyDoG[idxPyDoG].image[iImg];
+				dxx = PyDoG[idxPyDoG].image[iImg+1]+ PyDoG[idxPyDoG].image[iImg-1] - (2*d);
+				dyy = PyDoG[idxPyDoG].image[iImg+imgC]+ PyDoG[idxPyDoG].image[iImg-imgC] - (2*d);
+				dxy = (PyDoG[idxPyDoG].image[iImg+1+imgC]- PyDoG[idxPyDoG].image[iImg-1+imgC] - PyDoG[idxPyDoG].image[iImg+1-imgC] + PyDoG[idxPyDoG].image[iImg-1-imgC])/4.0;
+				tr = dxx + dyy;
+				det = dxx*dyy - dxy*dxy;
+				
+				if(det<=0 && !(tr*tr/det < 12.1)){
+					mM[idxmM].minMax[iImg]=0;
+					aux[iImg]=0;
+				}
+
+			}else
+			{
+				mM[idxmM].minMax[iImg]=0;
+				aux[iImg]=0;
+			}
+
+			
+
+		}
+	}
+
+
+
+
+
+
+
+}
 
 void MaskGenerator(double sigma, int size,Mat mask){//Generate Gaussian Kernel
 	Mat aux = getGaussianKernel(size,sigma,CV_32F);
@@ -223,7 +281,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 
 	cudaMalloc(&pyDoG,sizeof(ArrayImage)*images.size()*PyKDoG.size());
-	cudaMalloc(&minMax,sizeof(MinMax)*intvls*images.size() /*No se tamaño del arreglo*/);
+	cudaMalloc(&minMax,sizeof(MinMax)*intvls*images.size());
 	//cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
 
 	for (int i = 0; i < images.size() ; ++i)
@@ -307,10 +365,11 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 		int m=0;
 		for(m = mMidx; m < mMidx+intvls; ++m){
 			
-			char * out_D;
+			float * out_D;
+			//float * out = new float[sizeImage];
 			////////////////////////////////////////////////////////////////////////////////////////
 			/////////////////////////////////////////////////////////////////////Reservo Memoria GPU
-			cudaMalloc(&out_D,sizeof(char)*sizeImage);
+			cudaMalloc(&out_D,sizeof(float)*sizeImage);
 			//cout<<cudaGetErrorString(e)<<" cudaMalloc________Mask"<<endl;
 						
 			////////////////////////////////////////////////////////////////////////////////////////
@@ -319,12 +378,61 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 			LocateMaxMin<<<imgBlocks,1024>>>(pyDoG,m,out_D,minMax,maskC,images[i].rows,images[i].cols,idxmM);
 			++idxmM;
 			//cudaDeviceSynchronize();
+
+			//cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
+			//cout<<cudaGetErrorString(e)<<" cudaMemCopyDH________Mask"<<endl;
+
+			//Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
+			
+			//imshow("tesuto",image_out);
+    		//waitKey(0);
+    		//destroyAllWindows();
+			
+			//delete(out);
+			//cudaFree(out_D);
 		}
 		mMidx=m+2;
 		
 		////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////////
+	}
+
+
+	idxPyDoG=1, idxmM=0;
+	for(int i = 0; i< images.size(); ++i )
+	{	
+		int imgBlocks= ceil((double) images[i].cols/BW);
+		int sizeImage = images[i].rows*images[i].cols;
+
+		for (int j = 0; j < intvls; ++j)
+		{
+			float * out_D;
+			float * out = new float[sizeImage];
+			
+			cudaMalloc(&out_D,sizeof(float)*sizeImage);
+
+
+			cout<<idxmM <<" "<< idxPyDoG<<endl;
+			RemoveOutlier<<<imgBlocks,1024>>>(pyDoG,minMax,idxmM,idxPyDoG, images[i].rows,images[i].cols,out_D);
+			++idxmM;
+			++idxPyDoG;
+
+			cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
+			//cout<<cudaGetErrorString(e)<<" cudaMemCopyDH________Mask"<<endl;
+
+			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
+			if(i==images.size()-1)cout<<image_out<<endl;
+			imshow("tesuto",image_out);
+    		waitKey(0);
+    		destroyAllWindows();
+			
+			delete(out);
+			cudaFree(out_D);
+
+		}
+		idxPyDoG+=2;
+		
 	}
 	
 	

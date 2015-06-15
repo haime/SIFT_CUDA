@@ -23,7 +23,7 @@ struct ArrayImage
 
 struct MinMax
 {
-	char * minMax;
+	float * minMax;
 };
 
 
