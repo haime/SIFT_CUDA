@@ -3,7 +3,8 @@
 
 
 
-__global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int maskR,int maskC, int imgR,int imgC, float* imgOut, int idxPyDoG){
+__global__ void Convolution(float* image,float* mask, ArrayImage* PyDoG, int maskR,int maskC, int imgR,int imgC, float* imgOut, int idxPyDoG)
+{
 	int tid= threadIdx.x;
 	int bid= blockIdx.x;
 	int bDim=blockDim.x;
@@ -128,7 +129,7 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,M
 }
 
 
-__global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idxPyDoG, int imgR,int imgC, float * aux)
+__global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idxPyDoG, int imgR,int imgC)
 {
 	int tid= threadIdx.x;
 	int bid= blockIdx.x;
@@ -148,7 +149,7 @@ __global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idx
 		//////////////////////////////////////
 		
 		if(iImg < imgC*imgR){
-			aux[iImg]= mM[idxmM].minMax[iImg];
+			
 			
 
 			if(mM[idxmM].minMax[iImg]>0 && PyDoG[idxPyDoG].image[iImg]>0.02)
@@ -162,29 +163,56 @@ __global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idx
 				tr = dxx + dyy;
 				det = dxx*dyy - dxy*dxy;
 				
-				if(det<=0 && !(tr*tr/det < 12.1)){
+				if(det<=0 && !(tr*tr/det < 12.1))
 					mM[idxmM].minMax[iImg]=0;
-					aux[iImg]=0;
-				}
 
 			}else
 			{
 				mM[idxmM].minMax[iImg]=0;
-				aux[iImg]=0;
 			}
 
 			
 
 		}
 	}
-
-
-
-
-
-
-
 }
+
+__global__ void OrientationsHistogram(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idxPyDoG, int imgR,int imgC)
+{
+	int tid= threadIdx.x;
+	int bid= blockIdx.x;
+	int bDim=blockDim.x;
+	int gDim=gridDim.x;
+	int histo[7];
+	
+	int iImg=0;
+	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
+														 ////////los hilos en la imagen.
+	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+	{
+		//////////////////////////////////////
+		//////////////////////////////////////Calculo de indices
+		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
+		//////////////////////////////////////
+		//////////////////////////////////////
+		
+		if(iImg < imgC*imgR){
+			
+			
+
+			if(mM[idxmM].minMax[iImg]>0)
+			{
+				
+				
+			}
+
+			
+
+		}
+	}
+}
+
+
 
 void MaskGenerator(double sigma, int size,Mat mask){//Generate Gaussian Kernel
 	Mat aux = getGaussianKernel(size,sigma,CV_32F);
@@ -407,32 +435,11 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 		for (int j = 0; j < intvls; ++j)
 		{
-			float * out_D;
-			float * out = new float[sizeImage];
-			
-			cudaMalloc(&out_D,sizeof(float)*sizeImage);
-
-
-			cout<<idxmM <<" "<< idxPyDoG<<endl;
-			RemoveOutlier<<<imgBlocks,1024>>>(pyDoG,minMax,idxmM,idxPyDoG, images[i].rows,images[i].cols,out_D);
+			RemoveOutlier<<<imgBlocks,1024>>>(pyDoG,minMax,idxmM,idxPyDoG, images[i].rows,images[i].cols);
 			++idxmM;
 			++idxPyDoG;
-
-			cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
-			//cout<<cudaGetErrorString(e)<<" cudaMemCopyDH________Mask"<<endl;
-
-			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
-			if(i==images.size()-1)cout<<image_out<<endl;
-			imshow("tesuto",image_out);
-    		waitKey(0);
-    		destroyAllWindows();
-			
-			delete(out);
-			cudaFree(out_D);
-
 		}
 		idxPyDoG+=2;
-		
 	}
 	
 	
