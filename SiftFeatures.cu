@@ -177,40 +177,77 @@ __global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idx
 	}
 }
 
-__global__ void OrientationsHistogram(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idxPyDoG, int imgR,int imgC)
+__global__ void CountKeyPoint(MinMax * mM, int idxmM, int imgR, int imgC, int * numKeyP)
 {
 	int tid= threadIdx.x;
-	int bid= blockIdx.x;
 	int bDim=blockDim.x;
-	int gDim=gridDim.x;
-	int histo[7];
+	
+	
 	
 	int iImg=0;
-	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
-														 ////////los hilos en la imagen.
+	
+	int pxlThrd = ceil((double)(imgC*imgR)/bDim); ////////numero de veces que caben
+	
+	if(tid==0) printf("%i\n", pxlThrd);
+
+
+	if(tid==0) numKeyP=0;
+	__syncthreads();
+	
+	
+
+														
 	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
 	{
-		//////////////////////////////////////
-		//////////////////////////////////////Calculo de indices
-		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
-		//////////////////////////////////////
-		//////////////////////////////////////
-		
-		if(iImg < imgC*imgR){
-			
-			
-
-			if(mM[idxmM].minMax[iImg]>0)
-			{
-				
-				
-			}
-
-			
-
+		iImg= tid+(i*bDim);
+		if(iImg < imgC*imgR && mM[idxmM].minMax[iImg]>0){
+			atomicAdd(numKeyP,1);
 		}
 	}
+
+	
+
 }
+
+
+
+// __global__ void OrientationsHistogram(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idxPyDoG, int imgR,int imgC)
+// {
+// 	int tid= threadIdx.x;
+// 	// int bid= blockIdx.x;
+// 	int bDim=blockDim.x;
+// 	int gDim=gridDim.x;
+// 	int histo[7];
+	
+// 	int iImg=0;
+// 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
+// 														 ////////los hilos en la imagen.
+// 	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+// 	{
+// 		//////////////////////////////////////
+// 		//////////////////////////////////////Calculo de indices
+// 		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
+// 		//////////////////////////////////////
+// 		//////////////////////////////////////
+		
+// 		if(iImg < imgC*imgR){
+			
+			
+
+// 			if(mM[idxmM].minMax[iImg]>0)
+// 			{
+				
+				
+// 			}
+
+			
+
+// 		}
+// 	}
+// }
+
+
+
 
 
 
@@ -263,7 +300,6 @@ int PyramidKDoG(vector<Mat> & PyKDoG, int octvs, int intvls){
 int foundIndexesMaxMin(float* minMax,vector<int*> & idxMinMax, int count )
 {
 	vector<int> idxmM;
-
 	for (int c = 0; c <  count; ++c)
 	{
 		
@@ -272,10 +308,7 @@ int foundIndexesMaxMin(float* minMax,vector<int*> & idxMinMax, int count )
 			idxmM.push_back(c);
 			//cout<<c<<endl;
 		}
-	
 	}
-	
-
 	idxMinMax.push_back(idxmM.data());
 	
 
@@ -311,7 +344,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	cudaMalloc(&pyDoG,sizeof(ArrayImage)*images.size()*PyKDoG.size());
 	cudaMalloc(&minMax,sizeof(MinMax)*intvls*images.size());
 	//cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
-
+	cout<<intvls*images.size()<<endl;
 	for (int i = 0; i < images.size() ; ++i)
 	{
 		
@@ -431,8 +464,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	for(int i = 0; i< images.size(); ++i )
 	{	
 		int imgBlocks= ceil((double) images[i].cols/BW);
-		int sizeImage = images[i].rows*images[i].cols;
-
+		
 		for (int j = 0; j < intvls; ++j)
 		{
 			RemoveOutlier<<<imgBlocks,1024>>>(pyDoG,minMax,idxmM,idxPyDoG, images[i].rows,images[i].cols);
@@ -442,11 +474,32 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 		idxPyDoG+=2;
 	}
 	
+
+	idxmM=0;
+	for(int i =0 ; i<images.size(); ++i)
+	//for(int i =0 ; i<1 ; ++i)
+	{
+		int * numKeyP_D;
+		int numKeyP=0;
+		cudaMalloc(&numKeyP_D,sizeof(int));
+		//cudaMemcpy(numKeyP_D,&numKeyP,sizeof(int),cudaMemcpyHostToDevice);
+
+
+		for(int j =0; j<intvls ; ++j)
+		{
+			cout<<idxmM<<endl;
+			CountKeyPoint<<<1,1024>>>(minMax,idxmM,images[i].rows,images[i].cols,numKeyP_D);
+			++idxmM;
+			cudaMemcpy(&numKeyP,numKeyP_D,sizeof(int),cudaMemcpyDeviceToHost);
+			cout<<numKeyP<<endl;
+		}
+	}
+
+
 	
 
 	cudaFree(pyDoG);
 	cudaFree(minMax);
-
 
 	return 0;
 }
