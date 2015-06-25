@@ -183,28 +183,22 @@ __global__ void CountKeyPoint(MinMax * mM, int idxmM, int imgR, int imgC, int * 
 	int bDim=blockDim.x;
 	
 	
-	
+	__shared__ int num;
 	int iImg=0;
-	
 	int pxlThrd = ceil((double)(imgC*imgR)/bDim); ////////numero de veces que caben
-	
-	if(tid==0) printf("%i\n", pxlThrd);
-
-
-	if(tid==0) numKeyP=0;
+	if(tid==0) num=0;
 	__syncthreads();
-	
-	
-
-														
-	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+															
+	for(int i = 0; i < pxlThrd; ++i)///////////////////////////// Strike
 	{
 		iImg= tid+(i*bDim);
 		if(iImg < imgC*imgR && mM[idxmM].minMax[iImg]>0){
-			atomicAdd(numKeyP,1);
+			atomicAdd(&num,1);
 		}
+
 	}
 
+	numKeyP[0]=num;
 	
 
 }
@@ -344,7 +338,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	cudaMalloc(&pyDoG,sizeof(ArrayImage)*images.size()*PyKDoG.size());
 	cudaMalloc(&minMax,sizeof(MinMax)*intvls*images.size());
 	//cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
-	cout<<intvls*images.size()<<endl;
+	
 	for (int i = 0; i < images.size() ; ++i)
 	{
 		
@@ -475,25 +469,25 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	}
 	
 
+
+
 	idxmM=0;
+	int * numKeyP_D;
+	cudaMalloc(&numKeyP_D,sizeof(int));
 	for(int i =0 ; i<images.size(); ++i)
 	//for(int i =0 ; i<1 ; ++i)
 	{
-		int * numKeyP_D;
-		int numKeyP=0;
-		cudaMalloc(&numKeyP_D,sizeof(int));
-		//cudaMemcpy(numKeyP_D,&numKeyP,sizeof(int),cudaMemcpyHostToDevice);
-
-
+		int numKeyP;
 		for(int j =0; j<intvls ; ++j)
 		{
-			cout<<idxmM<<endl;
 			CountKeyPoint<<<1,1024>>>(minMax,idxmM,images[i].rows,images[i].cols,numKeyP_D);
-			++idxmM;
+			
 			cudaMemcpy(&numKeyP,numKeyP_D,sizeof(int),cudaMemcpyDeviceToHost);
 			cout<<numKeyP<<endl;
+			++idxmM;
 		}
 	}
+	cudaFree(numKeyP_D);
 
 
 	
