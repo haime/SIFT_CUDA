@@ -129,7 +129,7 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,M
 }
 
 
-__global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idxPyDoG, int imgR,int imgC)
+__global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idxPyDoG, int imgR,int imgC ,float* auxOut)
 {
 	int tid= threadIdx.x;
 	int bid= blockIdx.x;
@@ -171,10 +171,12 @@ __global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idx
 				mM[idxmM].minMax[iImg]=0;
 			}
 
+			auxOut[iImg]=mM[idxmM].minMax[iImg];
 			
 
 		}
 	}
+	
 }
 
 __global__ void CountKeyPoint(MinMax * mM, int idxmM, int imgR, int imgC, int * numKeyP)
@@ -456,12 +458,24 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 	idxPyDoG=1, idxmM=0;
 	for(int i = 0; i< images.size(); ++i )
-	{	
+	{	float* out_D;
+		int sizeImage = images[i].rows*images[i].cols;
 		int imgBlocks= ceil((double) images[i].cols/BW);
-		
+		cudaMalloc(&out_D,sizeof(float)*sizeImage);
+		float * out = new float[sizeImage];
+
 		for (int j = 0; j < intvls; ++j)
 		{
-			RemoveOutlier<<<imgBlocks,1024>>>(pyDoG,minMax,idxmM,idxPyDoG, images[i].rows,images[i].cols);
+			RemoveOutlier<<<imgBlocks,1024>>>(pyDoG,minMax,idxmM,idxPyDoG, images[i].rows,images[i].cols,out_D);
+			cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
+			
+
+			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
+			
+			imshow("tesuto",image_out);
+    		waitKey(0);
+    		destroyAllWindows();
+
 			++idxmM;
 			++idxPyDoG;
 		}
