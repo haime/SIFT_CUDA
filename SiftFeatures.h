@@ -27,6 +27,13 @@ struct MinMax
 };
 
 
+struct keyPoint
+{
+	float orientacion;
+	int x,y,octv; 
+
+};
+
 
 
 int PyramidKDoG(vector<Mat> &PyKDoG, int octvs, int intvls);

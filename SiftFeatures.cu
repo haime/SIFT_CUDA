@@ -81,7 +81,7 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,M
 		if(iImg < imgC*imgR){
 			
 			
-			int condition=(maskC/2)+imgC*(maskC/2);
+			int condition=maskC/2+imgC*(floor((double)maskC/2));
 			if (iImg-condition < 0  ||										///condicion arriba
 				iImg+condition > imgC*imgR ||								///condicion abajo
 				iImg%imgC < maskC/2 ||										///condicion izquierda
@@ -179,6 +179,155 @@ __global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idx
 	
 }
 
+
+
+__global__ void OriMag(ArrayImage* PyDoG, int idxPyDoG, int imgR,int imgC , ArrayImage* Mag, ArrayImage* Ori, int idxMagOri, float* MagAux, float* OriAux) 
+{
+	int tid= threadIdx.x;
+	int bid= blockIdx.x;
+	int bDim=blockDim.x;
+	int gDim=gridDim.x;
+	float dx,dy;
+			
+	int iImg=0;
+	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
+														 ////////los hilos en la imagen.
+	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+	{
+		//////////////////////////////////////
+		//////////////////////////////////////Calculo de indices
+		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
+		//////////////////////////////////////
+		//////////////////////////////////////
+		
+		if(iImg < imgC*imgR){
+			int condition=1/2+imgC*(floor((double)1/2));
+			if (iImg-condition < 0  ||										///condicion arriba
+				iImg+condition > imgC*imgR ||								///condicion abajo
+				iImg%imgC < 1/2 ||										///condicion izquierda
+				iImg%imgC > (imgC-1)-(1/2) )							///condicion derecha
+			{                  
+				OriAux[iImg]=0;
+				MagAux[iImg]=0;
+
+			}
+			else{
+				dx=PyDoG[idxPyDoG].image[iImg+1]-PyDoG[idxPyDoG].image[iImg-1];
+				dy=PyDoG[idxPyDoG].image[iImg+imgC]-PyDoG[idxPyDoG].image[iImg-imgC];
+				MagAux[iImg]=sqrt(dx*dx + dy*dy);
+				OriAux[iImg]=atan2(dy,dx);
+            }
+		}
+	}
+	
+	Mag[idxMagOri].image= MagAux;
+	Ori[idxMagOri].image= OriAux;
+
+	
+}
+
+
+
+__global__ void KeyPoints(ArrayImage * Mag, ArrayImage * Ori, MinMax * mM , int idxMOmM, keyPoint * KP, float sigma, int imgR,int imgC, int octava )
+{
+	int tid= threadIdx.x;
+	int bid= blockIdx.x;
+	int bDim=blockDim.x;
+	int gDim=gridDim.x;
+	float o = 0;
+	int x=0, y=0, octv=0;
+
+	
+
+
+	int iImg=0;
+	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
+														 ////////los hilos en la imagen.
+	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
+	{
+		//////////////////////////////////////
+		//////////////////////////////////////Calculo de indices
+		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
+		//////////////////////////////////////
+		//////////////////////////////////////
+		
+		if(iImg < imgC*imgR ){
+
+			if(mM[idxMOmM].minMax[iImg]>0){
+				
+
+				int condition=9/2+imgC*(floor((double)9/2));
+				if (iImg-condition < 0  ||										///condicion arriba
+					iImg+condition > imgC*imgR ||								///condicion abajo
+					iImg%imgC < 9/2 ||										///condicion izquierda
+					iImg%imgC > (imgC-1)-(9/2) )							///condicion derecha
+				{                  
+					
+					o=-1.0;
+					x=-1;
+					y=-1;
+					octv=-1;
+				}
+				else{
+					
+					float histo[36]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+					octv=octava;
+					x=iImg%imgC;
+					y=iImg/imgC;
+					
+					int idxMO= (iImg-4)-(4*imgC);
+					float exp_denom = 2.0 * sigma * sigma;
+					float w;
+					int bin;
+
+					for (int i = -4; i < 5; ++i)
+					{
+						for (int j = -4; j < 5; ++j)
+						{
+							w = exp( -( i*i + j*j ) / exp_denom );
+	  						bin = round((double) ( (36*Ori[idxMOmM].image[idxMO])/6.28318530718));
+	  						bin = ( bin < 36 )? bin : 0;
+	  						histo[bin]= w*Mag[idxMOmM].image[idxMO];
+	  						++idxMO;
+						}
+						idxMO=idxMO+imgC-9;
+					}
+
+					int idxH=0;
+					float valMaxH = histo[0];
+					for (int i = 1; i < 36; ++i)
+					{
+						if(histo[i]>valMaxH){
+							idxH = i;
+						}
+					}
+					int l = (idxH == 0)? 35:idxH-1;
+					int r = (idxH+1)%36;
+
+					float bin_= bin + ((0.5*(histo[l]-histo[r]))/(histo[l]-(2*histo[idxH])+histo[r]));
+					bin_= ( bin_ < 0 )? 36 + bin_ : ( bin_ >= 36 )? bin_ - 36 : bin_;
+					o=((6.28318530718*bin_)/36)-3.141592654;
+		        }
+
+
+		        KP[iImg].orientacion=o;
+		        KP[iImg].x=x;
+		        KP[iImg].y=y;
+		        KP[iImg].octv=octv;
+
+
+        	}
+		}
+	}
+	
+	
+
+
+
+}
+
+
+
 __global__ void CountKeyPoint(MinMax * mM, int idxmM, int imgR, int imgC, int * numKeyP)
 {
 	int tid= threadIdx.x;
@@ -207,40 +356,7 @@ __global__ void CountKeyPoint(MinMax * mM, int idxmM, int imgR, int imgC, int * 
 
 
 
-// __global__ void OrientationsHistogram(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idxPyDoG, int imgR,int imgC)
-// {
-// 	int tid= threadIdx.x;
-// 	// int bid= blockIdx.x;
-// 	int bDim=blockDim.x;
-// 	int gDim=gridDim.x;
-// 	int histo[7];
-	
-// 	int iImg=0;
-// 	int pxlThrd = ceil((double)(imgC*imgR)/(gDim*bDim)); ////////numero de veces que caben
-// 														 ////////los hilos en la imagen.
-// 	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
-// 	{
-// 		//////////////////////////////////////
-// 		//////////////////////////////////////Calculo de indices
-// 		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
-// 		//////////////////////////////////////
-// 		//////////////////////////////////////
-		
-// 		if(iImg < imgC*imgR){
-			
-			
 
-// 			if(mM[idxmM].minMax[iImg]>0)
-// 			{
-				
-				
-// 			}
-
-			
-
-// 		}
-// 	}
-// }
 
 
 
@@ -311,11 +427,8 @@ int foundIndexesMaxMin(float* minMax,vector<int*> & idxMinMax, int count )
 	return 0;
 }
 
-
-
-
 int SiftFeatures(Mat Image, vector<Mat> PyDoG){
-	const int intvls = 2;
+	const int intvls = 3;
 	int octvs;
 	//cudaError_t e;
 	octvs = log( min( Image.rows, Image.cols ) ) / log(2) - 2;
@@ -456,6 +569,13 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	}
 
 
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////Remover outliers
+
+
+
 	idxPyDoG=1, idxmM=0;
 	for(int i = 0; i< images.size(); ++i )
 	{	float* out_D;
@@ -475,13 +595,96 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 			imshow("tesuto",image_out);
     		waitKey(0);
     		destroyAllWindows();
-
+    		
+    		
 			++idxmM;
 			++idxPyDoG;
 		}
 		idxPyDoG+=2;
+
+		delete(out);
+		cudaFree(out_D);
 	}
+
+
+
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////Calculo de Orientaciones y magnitud en DoG
 	
+
+	ArrayImage * Mag;
+	ArrayImage * Ori;
+
+	cudaMalloc(&Mag,sizeof(ArrayImage)*intvls*images.size());
+	cudaMalloc(&Ori,sizeof(ArrayImage)*intvls*images.size());
+
+	idxPyDoG=1;
+	int idxMagOri=0;
+	for(int i = 0; i< images.size(); ++i )
+	{	
+		float * MagAux;
+		float * OriAux;
+		int sizeImage = images[i].rows*images[i].cols;
+		int imgBlocks= ceil((double) images[i].cols/BW);
+		cudaMalloc(&MagAux,sizeof(float)*sizeImage);
+		cudaMalloc(&OriAux,sizeof(float)*sizeImage);
+		float * out = new float[sizeImage];
+
+		for (int j = 0; j < intvls; ++j)
+		{
+			OriMag<<<imgBlocks,1024>>>(pyDoG,idxPyDoG, images[i].rows,images[i].cols,Mag,Ori,idxMagOri,MagAux,OriAux);
+			cudaMemcpy(out,MagAux,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
+			
+
+			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
+			
+			imshow("tesuto",image_out);
+    		waitKey(0);
+    		destroyAllWindows();
+
+			++idxMagOri;
+			++idxPyDoG;
+		}
+		idxPyDoG+=2;
+
+
+
+		delete(out);
+		cudaFree(MagAux);
+		cudaFree(OriAux);
+	}
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////Obtener orientacion de keypoints
+
+
+	
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	/*
 
 
 
@@ -504,8 +707,9 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	cudaFree(numKeyP_D);
 
 
-	
-
+	*/
+	cudaFree(Ori);
+	cudaFree(Mag);
 	cudaFree(pyDoG);
 	cudaFree(minMax);
 
