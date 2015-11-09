@@ -152,7 +152,7 @@ __global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idx
 			
 			
 
-			if(mM[idxmM].minMax[iImg]>0 && PyDoG[idxPyDoG].image[iImg]>0.02)
+			if(mM[idxmM].minMax[iImg]>0 && PyDoG[idxPyDoG].image[iImg]>0.05)
 			{
 				
 				float d, dxx, dyy, dxy, tr, det;
@@ -235,7 +235,7 @@ __global__ void KeyPoints(ArrayImage * Mag, ArrayImage * Ori, MinMax * mM , int 
 	int bDim=blockDim.x;
 	int gDim=gridDim.x;
 	float o = 0;
-	int x=0, y=0, octv=0;
+	int x=0, y=0, octv=-1;
 
 	
 
@@ -250,7 +250,7 @@ __global__ void KeyPoints(ArrayImage * Mag, ArrayImage * Ori, MinMax * mM , int 
 		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
 		//////////////////////////////////////
 		//////////////////////////////////////
-		
+		octv=-1;
 		if(iImg < imgC*imgR ){
 
 			if(mM[idxMOmM].minMax[iImg]>0){
@@ -310,13 +310,17 @@ __global__ void KeyPoints(ArrayImage * Mag, ArrayImage * Ori, MinMax * mM , int 
 		        }
 
 
-		        KP[iImg].orientacion=o;
-		        KP[iImg].x=x;
-		        KP[iImg].y=y;
-		        KP[iImg].octv=octv;
-
+		        
 
         	}
+        	KP[iImg].orientacion=o;
+		    KP[iImg].x=x;
+		    KP[iImg].y=y;
+		    KP[iImg].octv=octv;
+
+
+
+
 		}
 	}
 	
@@ -427,7 +431,7 @@ int foundIndexesMaxMin(float* minMax,vector<int*> & idxMinMax, int count )
 	return 0;
 }
 
-int SiftFeatures(Mat Image, vector<Mat> PyDoG){
+int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	const int intvls = 3;
 	int octvs;
 	//cudaError_t e;
@@ -608,7 +612,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 
 
 
-
+  
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Calculo de Orientaciones y magnitud en DoG
@@ -639,11 +643,11 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 			
 
 			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
-			
+			/*
 			imshow("tesuto",image_out);
     		waitKey(0);
     		destroyAllWindows();
-
+			*/
 			++idxMagOri;
 			++idxPyDoG;
 		}
@@ -660,54 +664,77 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG){
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Obtener orientacion de keypoints
 
-
+	vector<KeyPoint> KPoints;
 	
 	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	/*
-
-
-
 	idxmM=0;
-	int * numKeyP_D;
-	cudaMalloc(&numKeyP_D,sizeof(int));
-	for(int i =0 ; i<images.size(); ++i)
-	//for(int i =0 ; i<1 ; ++i)
+	for(int i = 0; i< images.size(); ++i )
 	{
-		int numKeyP;
-		for(int j =0; j<intvls ; ++j)
+		float sigma=sqrt(2)/6;
+		int imgBlocks= ceil((double) images[i].cols/BW);
+		keyPoint * KP;
+		keyPoint * KP_host = new keyPoint[images[i].rows*images[i].cols];
+		
+		cudaMalloc(&KP,sizeof(keyPoint)*images[i].rows*images[i].cols); 
+		for (int j = 0; j < intvls; ++j)
 		{
-			CountKeyPoint<<<1,1024>>>(minMax,idxmM,images[i].rows,images[i].cols,numKeyP_D);
-			
-			cudaMemcpy(&numKeyP,numKeyP_D,sizeof(int),cudaMemcpyDeviceToHost);
-			cout<<numKeyP<<endl;
+			KeyPoints<<<imgBlocks,1024>>>(Mag, Ori,  minMax , idxmM,  KP, sigma, images[i].rows,images[i].cols, i );
+			cudaMemcpy(KP_host,KP,sizeof(keyPoint)*images[i].rows*images[i].cols,cudaMemcpyDeviceToHost);
+
+			sigma*=1.5;
 			++idxmM;
+			
+			
+			
+			for(int k=0; k<(images[i].rows*images[i].cols); ++k){
+				
+
+				
+				if( !(KP_host[k].octv <0)  ){
+					cout<<idxmM<<endl;
+					KeyPoint aux(KP_host[k].x,KP_host[k].y,1,KP_host[k].orientacion,20,KP_host[k].octv);
+					KPoints.push_back(aux);
+				}
+			}
 		}
+
+		cout<<KPoints.size()<<endl;
+
+
+
+
+
+		delete(KP_host);
+		cudaFree(KP);
 	}
-	cudaFree(numKeyP_D);
+	Mat out;
+	drawKeypoints(I,KPoints,out);
+	imshow("tesuto",out);
+    waitKey(0);
+    destroyAllWindows();
 
 
-	*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+	
 	cudaFree(Ori);
 	cudaFree(Mag);
 	cudaFree(pyDoG);

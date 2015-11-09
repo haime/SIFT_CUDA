@@ -37,7 +37,7 @@ struct keyPoint
 
 
 int PyramidKDoG(vector<Mat> &PyKDoG, int octvs, int intvls);
-int SiftFeatures(Mat Image, vector<Mat> PyDoG);
+int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I);
 void MaskGenerator(double sigma, int size,Mat mask);
 int ResizeImage(Mat image,vector<Mat>& images, int octvs);
 void VectorToPointer(vector<Mat> img, ArrayImage * pImg);

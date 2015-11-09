@@ -22,11 +22,11 @@ int main(int argc, char *argv[])
       cout<<"Debes ingresar nombre de una imagen existente ./SIFT_Test [nombre imagen].[extención]"<<endl;
        return 1;
 	}
-
+	Mat i;
 	double C8TO32=0.003921568627;
-	image.convertTo(image,CV_32F,C8TO32);
+	image.convertTo(i,CV_32F,C8TO32);
 	vector<Mat> PyDoG;
-	SiftFeatures(image, PyDoG);
+	SiftFeatures(i, PyDoG,image );
 	imshow("test",image);
 	waitKey(0);
 	destroyAllWindows();
