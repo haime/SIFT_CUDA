@@ -406,7 +406,7 @@ int PyramidKDoG(vector<Mat> & PyKDoG, int octvs, int intvls){
 	/////////////////////////////////////////////////////////////////////Resta de Gausianas
 	for(int i=0; i<intvls+2; ++i){
 		Mat aux=Mat::ones(size,size,CV_32F);
-		subtract(PyGauss[i+1],PyGauss[i],aux);
+		subtract(PyGauss[i],PyGauss[i+1],aux);
 		PyKDoG.push_back(aux);
 	}
 	///////////////////////////////////////////////////////////////////////////////////////
@@ -513,7 +513,9 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 
 			//Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
 			
-			//imshow("tesuto",image_out);
+
+
+			//imshow("PyDoG",1-image_out);
     		//waitKey(0);
     		//destroyAllWindows();
 			
@@ -558,12 +560,13 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 
 			//Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
 			
-			//imshow("tesuto",image_out);
+			//imshow("MinMax",image_out);
+
     		//waitKey(0);
     		//destroyAllWindows();
 			
 			//delete(out);
-			//cudaFree(out_D);
+			
 		}
 		mMidx=m+2;
 		
@@ -586,19 +589,19 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 		int sizeImage = images[i].rows*images[i].cols;
 		int imgBlocks= ceil((double) images[i].cols/BW);
 		cudaMalloc(&out_D,sizeof(float)*sizeImage);
-		float * out = new float[sizeImage];
+		//float * out = new float[sizeImage];
 
 		for (int j = 0; j < intvls; ++j)
 		{
 			RemoveOutlier<<<imgBlocks,1024>>>(pyDoG,minMax,idxmM,idxPyDoG, images[i].rows,images[i].cols,out_D);
-			cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
+			//cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
 			
 
-			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
+			//Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
 			
-			imshow("tesuto",image_out);
-    		waitKey(0);
-    		destroyAllWindows();
+			//imshow("MinMax Filtrados",image_out);
+    		//waitKey(0);
+    		//destroyAllWindows();
     		
     		
 			++idxmM;
@@ -606,7 +609,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 		}
 		idxPyDoG+=2;
 
-		delete(out);
+		//delete(out);
 		cudaFree(out_D);
 	}
 
@@ -668,7 +671,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	
 	
 	idxmM=0;
-	for(int i = 0; i< images.size(); ++i )
+	for(int i = 0; i< 1; ++i )
 	{
 		float sigma=sqrt(2)/6;
 		int imgBlocks= ceil((double) images[i].cols/BW);
@@ -691,7 +694,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 
 				
 				if( !(KP_host[k].octv <0)  ){
-					cout<<idxmM<<endl;
+					//cout<<idxmM<<endl;
 					KeyPoint aux(KP_host[k].x,KP_host[k].y,1,KP_host[k].orientacion,20,KP_host[k].octv);
 					KPoints.push_back(aux);
 				}
@@ -709,7 +712,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	}
 	Mat out;
 	drawKeypoints(I,KPoints,out);
-	imshow("tesuto",out);
+	imshow("Puntos Caracteristicos SIFT",out);
     waitKey(0);
     destroyAllWindows();
 
