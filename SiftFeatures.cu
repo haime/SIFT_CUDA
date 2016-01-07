@@ -68,10 +68,10 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,M
 	for(int i = 0; i <pxlThrd; ++i)///////////////////////////// Strike 
 	
 	{
-		int min=0;
-		int max=0;
+		//int min=0;
+		//int max=0;
 		float value=0.0;
-		float compare =0.0;
+		//float compare =0.0;
 		//////////////////////////////////////
 		//////////////////////////////////////Calculo de indices
 		iImg=(tid+(bDim*bid)) + (i*gDim*bDim); //// pixel en el que trabajara el hilo
@@ -92,34 +92,65 @@ __global__ void LocateMaxMin(ArrayImage* PyDoG, int idxPyDoG , float * imgOut ,M
 			else{
 				
 				value=PyDoG[idxPyDoG].image[iImg];
-				
-				for (int m = -1; m < 2; ++m)
-				{
-					int itImg=iImg-(1+imgC);
-					
-					for (int j = 0; j < 3; ++j)
-					{		
-						for (int h = 0; h < 3; ++h)
-						{
-							compare =PyDoG[idxPyDoG+m].image[itImg];
-							if(value<=compare && max==0)
-							{
-								++min;
-							}
-							else if(value>=compare && min==0)
-							{
-								++max;
-							}
-							++itImg;
-						}
-						itImg+=imgC-3;
-					}
-				}
-  				//printf("%i %i\n",min,max );
-				if( (min==26 || max==26)) {
+
+				if(value > PyDoG[idxPyDoG-1].image[iImg-(1+imgC)] &&     
+				   value > PyDoG[idxPyDoG-1].image[iImg-imgC] &&
+				   value > PyDoG[idxPyDoG-1].image[iImg-(imgC-1)] &&
+				   value > PyDoG[idxPyDoG-1].image[iImg-1] &&
+				   value > PyDoG[idxPyDoG-1].image[iImg] &&
+				   value > PyDoG[idxPyDoG-1].image[iImg+1] &&
+				   value > PyDoG[idxPyDoG-1].image[iImg+(imgC-1)] &&
+				   value > PyDoG[idxPyDoG-1].image[iImg+imgC] &&
+				   value > PyDoG[idxPyDoG-1].image[iImg+(1+imgC)] &&
+				   value > PyDoG[idxPyDoG].image[iImg-(1+imgC)] &&
+				   value > PyDoG[idxPyDoG].image[iImg-imgC] &&
+				   value > PyDoG[idxPyDoG].image[iImg-(imgC-1)] &&
+				   value > PyDoG[idxPyDoG].image[iImg-1] &&
+				   value > PyDoG[idxPyDoG].image[iImg+1] &&
+				   value > PyDoG[idxPyDoG].image[iImg+(imgC-1)] &&
+				   value > PyDoG[idxPyDoG].image[iImg+imgC] &&
+				   value > PyDoG[idxPyDoG].image[iImg+(1+imgC)] &&
+				   value > PyDoG[idxPyDoG+1].image[iImg-(1+imgC)] &&
+				   value > PyDoG[idxPyDoG+1].image[iImg-imgC] &&
+				   value > PyDoG[idxPyDoG+1].image[iImg-(imgC-1)] &&
+				   value > PyDoG[idxPyDoG+1].image[iImg-1] &&
+				   value > PyDoG[idxPyDoG+1].image[iImg] &&
+				   value > PyDoG[idxPyDoG+1].image[iImg+1] &&
+				   value > PyDoG[idxPyDoG+1].image[iImg+(imgC-1)] &&
+				   value > PyDoG[idxPyDoG+1].image[iImg+imgC] &&
+				   value > PyDoG[idxPyDoG+1].image[iImg+(1+imgC)]) {///Max
 					imgOut[iImg]=1;
-				}else{
+				}else if(value < PyDoG[idxPyDoG-1].image[iImg-(1+imgC)] &&     
+				   value < PyDoG[idxPyDoG-1].image[iImg-imgC] &&
+				   value < PyDoG[idxPyDoG-1].image[iImg-(imgC-1)] &&
+				   value < PyDoG[idxPyDoG-1].image[iImg-1] &&
+				   value < PyDoG[idxPyDoG-1].image[iImg] &&
+				   value < PyDoG[idxPyDoG-1].image[iImg+1] &&
+				   value < PyDoG[idxPyDoG-1].image[iImg+(imgC-1)] &&
+				   value < PyDoG[idxPyDoG-1].image[iImg+imgC] &&
+				   value < PyDoG[idxPyDoG-1].image[iImg+(1+imgC)] &&
+				   value < PyDoG[idxPyDoG].image[iImg-(1+imgC)] &&
+				   value < PyDoG[idxPyDoG].image[iImg-imgC] &&
+				   value < PyDoG[idxPyDoG].image[iImg-(imgC-1)] &&
+				   value < PyDoG[idxPyDoG].image[iImg-1] &&
+				   value < PyDoG[idxPyDoG].image[iImg+1] &&
+				   value < PyDoG[idxPyDoG].image[iImg+(imgC-1)] &&
+				   value < PyDoG[idxPyDoG].image[iImg+imgC] &&
+				   value < PyDoG[idxPyDoG].image[iImg+(1+imgC)] &&
+				   value < PyDoG[idxPyDoG+1].image[iImg-(1+imgC)] &&
+				   value < PyDoG[idxPyDoG+1].image[iImg-imgC] &&
+				   value < PyDoG[idxPyDoG+1].image[iImg-(imgC-1)] &&
+				   value < PyDoG[idxPyDoG+1].image[iImg-1] &&
+				   value < PyDoG[idxPyDoG+1].image[iImg] &&
+				   value < PyDoG[idxPyDoG+1].image[iImg+1] &&
+				   value < PyDoG[idxPyDoG+1].image[iImg+(imgC-1)] &&
+				   value < PyDoG[idxPyDoG+1].image[iImg+imgC] &&
+				   value < PyDoG[idxPyDoG+1].image[iImg+(1+imgC)]){//Min
+					imgOut[iImg]=1;
+				} else
+				{
 					imgOut[iImg]=0;
+
 				}
 			
             }
@@ -152,19 +183,30 @@ __global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idx
 			
 			
 
-			if(mM[idxmM].minMax[iImg]>0 && PyDoG[idxPyDoG].image[iImg]>0.05)
+			if(mM[idxmM].minMax[iImg]>0 && 	fabs(PyDoG[idxPyDoG].image[iImg])> 0.024)
 			{
 				
 				float d, dxx, dyy, dxy, tr, det;
 				d = PyDoG[idxPyDoG].image[iImg];
-				dxx = PyDoG[idxPyDoG].image[iImg+1]+ PyDoG[idxPyDoG].image[iImg-1] - (2*d);
-				dyy = PyDoG[idxPyDoG].image[iImg+imgC]+ PyDoG[idxPyDoG].image[iImg-imgC] - (2*d);
-				dxy = (PyDoG[idxPyDoG].image[iImg+1+imgC]- PyDoG[idxPyDoG].image[iImg-1+imgC] - PyDoG[idxPyDoG].image[iImg+1-imgC] + PyDoG[idxPyDoG].image[iImg-1-imgC])/4.0;
+				dxx = PyDoG[idxPyDoG].image[iImg-imgC]+ PyDoG[idxPyDoG].image[iImg+imgC] - 2*d;
+				dyy = PyDoG[idxPyDoG].image[iImg-1]+ PyDoG[idxPyDoG].image[iImg+1] - 2*d;
+				dxy = (PyDoG[idxPyDoG].image[iImg-imgC-1] + PyDoG[idxPyDoG].image[iImg+1+imgC] - PyDoG[idxPyDoG].image[iImg+imgC-1] - PyDoG[idxPyDoG].image[iImg-imgC+1])/4.0;
 				tr = dxx + dyy;
 				det = dxx*dyy - dxy*dxy;
-				
-				if(det<=0 && !(tr*tr/det < 12.1))
+				/*
+				if(det <= 0 )
 					mM[idxmM].minMax[iImg]=0;
+				else if( (tr*tr/det) < 12.1){
+					mM[idxmM].minMax[iImg]=1;
+				}else{
+					mM[idxmM].minMax[iImg]=0;
+				}*/
+
+				if(det<0 || tr*tr/det > 7.2)
+				{
+					mM[idxmM].minMax[iImg]=0;
+				}
+
 
 			}else
 			{
@@ -176,7 +218,6 @@ __global__ void RemoveOutlier(ArrayImage* PyDoG, MinMax * mM, int idxmM, int idx
 
 		}
 	}
-	
 }
 
 
@@ -214,7 +255,9 @@ __global__ void OriMag(ArrayImage* PyDoG, int idxPyDoG, int imgR,int imgC , Arra
 			else{
 				dx=PyDoG[idxPyDoG].image[iImg+1]-PyDoG[idxPyDoG].image[iImg-1];
 				dy=PyDoG[idxPyDoG].image[iImg+imgC]-PyDoG[idxPyDoG].image[iImg-imgC];
+				
 				MagAux[iImg]=sqrt(dx*dx + dy*dy);
+
 				OriAux[iImg]=atan2(dy,dx);
             }
 		}
@@ -222,8 +265,6 @@ __global__ void OriMag(ArrayImage* PyDoG, int idxPyDoG, int imgR,int imgC , Arra
 	
 	Mag[idxMagOri].image= MagAux;
 	Ori[idxMagOri].image= OriAux;
-
-	
 }
 
 
@@ -234,7 +275,7 @@ __global__ void KeyPoints(ArrayImage * Mag, ArrayImage * Ori, MinMax * mM , int 
 	int bid= blockIdx.x;
 	int bDim=blockDim.x;
 	int gDim=gridDim.x;
-	float o = 0;
+	float o = 0, val=0;
 	int x=0, y=0, octv=-1;
 
 	
@@ -253,81 +294,81 @@ __global__ void KeyPoints(ArrayImage * Mag, ArrayImage * Ori, MinMax * mM , int 
 		octv=-1;
 		if(iImg < imgC*imgR ){
 
-			if(mM[idxMOmM].minMax[iImg]>0){
+			if(mM[idxMOmM].minMax[iImg]>0 ){
 				
-
-				int condition=9/2+imgC*(floor((double)9/2));
-				if (iImg-condition < 0  ||										///condicion arriba
-					iImg+condition > imgC*imgR ||								///condicion abajo
-					iImg%imgC < 9/2 ||										///condicion izquierda
-					iImg%imgC > (imgC-1)-(9/2) )							///condicion derecha
-				{                  
-					
-					o=-1.0;
-					x=-1;
-					y=-1;
-					octv=-1;
-				}
-				else{
-					
 					float histo[36]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 					octv=octava;
 					x=iImg%imgC;
 					y=iImg/imgC;
 					
-					int idxMO= (iImg-4)-(4*imgC);
+					int idxMO= (iImg-5)-(5*imgC);
 					float exp_denom = 2.0 * sigma * sigma;
 					float w;
 					int bin;
 
-					for (int i = -4; i < 5; ++i)
+					for (int i = -5; i < 6; ++i)
 					{
-						for (int j = -4; j < 5; ++j)
+						for (int j = -5; j < 6; ++j)
 						{
 							w = exp( -( i*i + j*j ) / exp_denom );
-	  						bin = round((double) ( (36*Ori[idxMOmM].image[idxMO])/6.28318530718));
-	  						bin = ( bin < 36 )? bin : 0;
-	  						histo[bin]= w*Mag[idxMOmM].image[idxMO];
+	  						bin =(Ori[idxMOmM].image[idxMO]<0)?round((double) (18*(6.283185307-Ori[idxMOmM].image[idxMO])/3.141592654)): round((double) (18*Ori[idxMOmM].image[idxMO]/3.141592654));
+	  						histo[bin]+= w*Mag[idxMOmM].image[idxMO];
 	  						++idxMO;
 						}
-						idxMO=idxMO+imgC-9;
+						idxMO=idxMO+imgC-11;
+
 					}
+
+
 
 					int idxH=0;
 					float valMaxH = histo[0];
 					for (int i = 1; i < 36; ++i)
-					{
+					{	
+						
 						if(histo[i]>valMaxH){
 							idxH = i;
+							valMaxH=histo[i]; 
+							
 						}
 					}
+
+
+					//printf("%f\n", valMaxH);
+
 					int l = (idxH == 0)? 35:idxH-1;
 					int r = (idxH+1)%36;
 
-					float bin_= bin + ((0.5*(histo[l]-histo[r]))/(histo[l]-(2*histo[idxH])+histo[r]));
+					float bin_;
+					bin_= idxH + ((0.5*(histo[l]-histo[r]))/(histo[l]-(2*histo[idxH])+histo[r]));
+					
+							
+				
+
 					bin_= ( bin_ < 0 )? 36 + bin_ : ( bin_ >= 36 )? bin_ - 36 : bin_;
-					o=((6.28318530718*bin_)/36)-3.141592654;
-		        }
+					
+					o=((360*bin_)/36);//-3.141592654;
+					val=valMaxH; 
+        	}
+        	else{
+        		o=-1.0;
+				x=-1;
+				y=-1;
+				octv=-1;
 
-
-		        
 
         	}
         	KP[iImg].orientacion=o;
 		    KP[iImg].x=x;
 		    KP[iImg].y=y;
 		    KP[iImg].octv=octv;
+		    KP[iImg].size=val;
 
 
 
 
 		}
 	}
-	
-	
-
-
-
 }
 
 
@@ -354,24 +395,15 @@ __global__ void CountKeyPoint(MinMax * mM, int idxmM, int imgR, int imgC, int * 
 	}
 
 	numKeyP[0]=num;
-	
-
 }
-
-
-
-
-
-
-
-
-
 
 void MaskGenerator(double sigma, int size,Mat mask){//Generate Gaussian Kernel
 	Mat aux = getGaussianKernel(size,sigma,CV_32F);
 	Mat aux_t;
 	transpose(aux,aux_t);
 	mask=aux*aux_t;
+	
+
 }
 
 int ResizeImage(Mat image,vector<Mat>& images, int octvs){
@@ -387,29 +419,34 @@ int ResizeImage(Mat image,vector<Mat>& images, int octvs){
 
 int PyramidKDoG(vector<Mat> & PyKDoG, int octvs, int intvls){
 	vector<double> sig;
-	double k = 1.5;
-	double sigma= sqrt(2)/6;
+	double sigma =sqrt(2.0f);
 	vector<Mat> PyGauss;
-	int size = 9;//size of gaussian mask
+	Mat resizeI;
+	int size = 11;//size of gaussian mask
 	Mat mask=Mat::ones(size,size,CV_32F);
-	MaskGenerator(sigma,size,mask);
+	MaskGenerator(1,size,mask);
 	PyGauss.push_back(mask);
-
+	
 	for(int i=1; i<intvls+3; ++i){	
 		Mat aux=Mat::ones(size,size,CV_32F);
-		sigma*=k;
-		MaskGenerator(sigma,size,aux);
+		double sigmaf=sqrt(pow(2.0,2.0/intvls)-1) * sigma;
+		sigma= pow(2.0,1.0/ intvls ) * sigma;
+		MaskGenerator(sigmaf,size,aux);
 		PyGauss.push_back(aux);
-		
 	}
-	///////////////////////////////////////////////////////////////////////////////////////
+	
+	//////////////////////////////
+	/////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Resta de Gausianas
 	for(int i=0; i<intvls+2; ++i){
 		Mat aux=Mat::ones(size,size,CV_32F);
-		subtract(PyGauss[i],PyGauss[i+1],aux);
+		subtract(PyGauss[i+1],PyGauss[i],aux);
 		PyKDoG.push_back(aux);
 	}
 	///////////////////////////////////////////////////////////////////////////////////////
+
+
+	
 	return 0;
 }
 
@@ -431,28 +468,32 @@ int foundIndexesMaxMin(float* minMax,vector<int*> & idxMinMax, int count )
 	return 0;
 }
 
-int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
+float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	const int intvls = 3;
 	int octvs;
 	//cudaError_t e;
 	octvs = log( min( Image.rows, Image.cols ) ) / log(2) - 2;
 	vector<Mat> PyKDoG;
 	vector<Mat> images;
-
-	
-
-	PyramidKDoG( PyKDoG,octvs,intvls);
-	ResizeImage(Image,images,octvs);
-	int idxPyDoG=0;
-	
-	
 	ArrayImage * pyDoG;
 	MinMax * minMax;
 	int mMidx=1;
+	int idxPyDoG=0;
+
+
+
+	cudaEvent_t start, stop;
+ 	cudaEventCreate(&start);
+ 	cudaEventCreate(&stop);
+
+
+ 	cudaEventRecord(start, 0);
+
+	PyramidKDoG( PyKDoG,octvs,intvls);
+	ResizeImage(Image,images,octvs);
+	
 	////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Reservo Memoria GPU
-
-
 
 	cudaMalloc(&pyDoG,sizeof(ArrayImage)*images.size()*PyKDoG.size());
 	cudaMalloc(&minMax,sizeof(MinMax)*intvls*images.size());
@@ -514,8 +555,8 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 			//Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
 			
 
-
-			//imshow("PyDoG",1-image_out);
+			//cout<<image_out<<endl;
+			//imshow("PyDoG",image_out);
     		//waitKey(0);
     		//destroyAllWindows();
 			
@@ -575,8 +616,6 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 		////////////////////////////////////////////////////////////////////////////////////////
 	}
 
-
-
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Remover outliers
@@ -584,6 +623,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 
 
 	idxPyDoG=1, idxmM=0;
+	
 	for(int i = 0; i< images.size(); ++i )
 	{	float* out_D;
 		int sizeImage = images[i].rows*images[i].cols;
@@ -612,10 +652,6 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 		//delete(out);
 		cudaFree(out_D);
 	}
-
-
-
-  
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Calculo de Orientaciones y magnitud en DoG
@@ -623,6 +659,7 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 
 	ArrayImage * Mag;
 	ArrayImage * Ori;
+	
 
 	cudaMalloc(&Mag,sizeof(ArrayImage)*intvls*images.size());
 	cudaMalloc(&Ori,sizeof(ArrayImage)*intvls*images.size());
@@ -637,20 +674,20 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 		int imgBlocks= ceil((double) images[i].cols/BW);
 		cudaMalloc(&MagAux,sizeof(float)*sizeImage);
 		cudaMalloc(&OriAux,sizeof(float)*sizeImage);
-		float * out = new float[sizeImage];
+		//float * out = new float[sizeImage];
 
 		for (int j = 0; j < intvls; ++j)
 		{
 			OriMag<<<imgBlocks,1024>>>(pyDoG,idxPyDoG, images[i].rows,images[i].cols,Mag,Ori,idxMagOri,MagAux,OriAux);
-			cudaMemcpy(out,MagAux,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
+			//cudaMemcpy(out,OriAux,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
 			
 
-			Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
-			/*
-			imshow("tesuto",image_out);
-    		waitKey(0);
-    		destroyAllWindows();
-			*/
+			//Mat image_out(images[i].rows,images[i].cols,CV_32F,out);
+			
+			//imshow("tesuto",image_out);
+    		//waitKey(0);
+    		//destroyAllWindows();
+			
 			++idxMagOri;
 			++idxPyDoG;
 		}
@@ -658,92 +695,100 @@ int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 
 
 
-		delete(out);
-		cudaFree(MagAux);
-		cudaFree(OriAux);
+		//delete(out);
+		//cudaFree(MagAux);
+		//cudaFree(OriAux);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Obtener orientacion de keypoints
 
-	vector<KeyPoint> KPoints;
+	//vector<KeyPoint> KPoints;
 	
 	
 	idxmM=0;
-	for(int i = 0; i< 1; ++i )
+	for(int i = 0; i< images.size(); ++i )
 	{
-		float sigma=sqrt(2)/6;
+		float sigma=sqrt(2.0f);
 		int imgBlocks= ceil((double) images[i].cols/BW);
 		keyPoint * KP;
-		keyPoint * KP_host = new keyPoint[images[i].rows*images[i].cols];
+		//keyPoint * KP_host = new keyPoint[images[i].rows*images[i].cols];
 		
 		cudaMalloc(&KP,sizeof(keyPoint)*images[i].rows*images[i].cols); 
 		for (int j = 0; j < intvls; ++j)
 		{
 			KeyPoints<<<imgBlocks,1024>>>(Mag, Ori,  minMax , idxmM,  KP, sigma, images[i].rows,images[i].cols, i );
-			cudaMemcpy(KP_host,KP,sizeof(keyPoint)*images[i].rows*images[i].cols,cudaMemcpyDeviceToHost);
+			//cudaMemcpy(KP_host,KP,sizeof(keyPoint)*images[i].rows*images[i].cols,cudaMemcpyDeviceToHost);
 
-			sigma*=1.5;
+			sigma= pow(2.0,1.0/ intvls ) * sigma;
 			++idxmM;
-			
+			/*
 			
 			
 			for(int k=0; k<(images[i].rows*images[i].cols); ++k){
 				
 
 				
-				if( !(KP_host[k].octv <0)  ){
+				if( !(KP_host[k].octv <0) ){
 					//cout<<idxmM<<endl;
-					KeyPoint aux(KP_host[k].x,KP_host[k].y,1,KP_host[k].orientacion,20,KP_host[k].octv);
+					if (i>0)
+					{
+						KP_host[k].x*=pow(2,i);
+						KP_host[k].y*=pow(2,i);
+					}
+					KeyPoint aux(KP_host[k].x,KP_host[k].y,KP_host[k].size,KP_host[k].orientacion ,0,KP_host[k].octv);
+					//cout<<KP_host[k].size<<endl;
 					KPoints.push_back(aux);
 				}
-			}
+			}*/
 		}
-
-		cout<<KPoints.size()<<endl;
-
-
-
-
-
-		delete(KP_host);
+		//delete(KP_host);
 		cudaFree(KP);
 	}
+
+	cudaEventRecord(stop, 0);
+ 	cudaEventSynchronize(stop);
+ 
+ 	float elapsedTime;
+ 	cudaEventElapsedTime(&elapsedTime,start, stop);
+ 	cout<< "Tiempo total "<<elapsedTime << " en milseg"<<endl;
+
+ 	cudaEventDestroy(start);
+ 	cudaEventDestroy(stop);
+
+
+ 	//cout<<KPoints.size()<<endl;
+ 	
+ 	
 	Mat out;
-	drawKeypoints(I,KPoints,out);
-	imshow("Puntos Caracteristicos SIFT",out);
-    waitKey(0);
-    destroyAllWindows();
+	//drawKeypoints(I,KPoints,out);
+	//imshow("Puntos Caracteristicos SIFT",out);
+    //waitKey(0);
+    //destroyAllWindows();
 
 
+    /*Ptr<DescriptorExtractor> featureExtractor = DescriptorExtractor::create("SIFT");
+    Mat descriptors;
+  	featureExtractor->compute(I, KPoints, descriptors);
 
-
-
-
-
-
-
-
-
-
-
-
-
+  	
+  	Mat outputImage;
+  	Scalar keypointColor = Scalar(255, 0, 0);   
+  	drawKeypoints(I, KPoints, outputImage, keypointColor, DrawMatchesFlags::DEFAULT);
 	
 
+	imshow("test",outputImage);
+	waitKey(0);
+	destroyAllWindows();*/
 
 
-
-
-
-	
 	cudaFree(Ori);
 	cudaFree(Mag);
 	cudaFree(pyDoG);
 	cudaFree(minMax);
 
-	return 0;
+	return elapsedTime;
 }
 
 

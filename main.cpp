@@ -22,13 +22,23 @@ int main(int argc, char *argv[])
       cout<<"Debes ingresar nombre de una imagen existente ./SIFT_Test [nombre imagen].[extención]"<<endl;
        return 1;
 	}
-	Mat i;
-	double C8TO32=0.003921568627;
-	image.convertTo(i,CV_32F,C8TO32);
-	vector<Mat> PyDoG;
-	SiftFeatures(i, PyDoG,image );
-	imshow("test",image);
-	waitKey(0);
-	destroyAllWindows();
+	float tm=0;
+	for (int k = 0; k < 101; ++k)
+	{
+		Mat BI;
+		Mat dImage(image.rows*2,image.cols*2,CV_8U);
+		GaussianBlur(image, BI, Size(0,0) ,0.5);
+		resize(BI,dImage,dImage.size());
+
+		Mat i;
+		double C8TO32=0.003921568627;
+		dImage.convertTo(i,CV_32F,C8TO32);
+		vector<Mat> PyDoG;
+		tm+=(k==0)?0:SiftFeatures(i, PyDoG,dImage );
+	}
+	cout<<"tiempoPromedio "<<tm/100<<endl;
+	//imshow("test",image);
+	//waitKey(0);
+	//destroyAllWindows();
 	return 0;
 }
