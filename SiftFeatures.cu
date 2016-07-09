@@ -468,7 +468,7 @@ int foundIndexesMaxMin(float* minMax,vector<int*> & idxMinMax, int count )
 	return 0;
 }
 
-float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
+int SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	const int intvls = 3;
 	int octvs;
 	//cudaError_t e;
@@ -479,7 +479,11 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	MinMax * minMax;
 	int mMidx=1;
 	int idxPyDoG=0;
-
+	cudaFuncSetCacheConfig(Convolution,cudaFuncCachePreferL1);
+	cudaFuncSetCacheConfig(LocateMaxMin,cudaFuncCachePreferL1);
+	cudaFuncSetCacheConfig(RemoveOutlier,cudaFuncCachePreferL1);
+	cudaFuncSetCacheConfig(OriMag,cudaFuncCachePreferL1);
+	cudaFuncSetCacheConfig(KeyPoints,cudaFuncCachePreferL1);
 
 
 	cudaEvent_t start, stop;
@@ -487,7 +491,7 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
  	cudaEventCreate(&stop);
 
 
- 	cudaEventRecord(start, 0);
+ 	
 
 	PyramidKDoG( PyKDoG,octvs,intvls);
 	ResizeImage(Image,images,octvs);
@@ -498,6 +502,7 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	cudaMalloc(&pyDoG,sizeof(ArrayImage)*images.size()*PyKDoG.size());
 	cudaMalloc(&minMax,sizeof(MinMax)*intvls*images.size());
 	//cout<<cudaGetErrorString(e)<<" cudaMalloc"<<endl;
+	cudaEventRecord(start, 0);
 	
 	for (int i = 0; i < images.size() ; ++i)
 	{
@@ -569,8 +574,12 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 		////////////////////////////////////////////////////////////////////////////////////////
 	}
 
+
+
 	int maskC =PyKDoG[0].cols;
 	int idxmM=0;
+	
+ 	
 	for (int i = 0; i <images.size() ; ++i)
 	{
 		int sizeImage = images[i].rows*images[i].cols;
@@ -592,6 +601,7 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 			////////////////////////////////////////////////////////////////////////////////////////
 			/////////////////////////////////////////////////////////////////////Lanzo Kernel
 			///////entrega ya los puntos descartanbdo los de bajo contraste
+			
 			LocateMaxMin<<<imgBlocks,1024>>>(pyDoG,m,out_D,minMax,maskC,images[i].rows,images[i].cols,idxmM);
 			++idxmM;
 			//cudaDeviceSynchronize();
@@ -633,6 +643,7 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 
 		for (int j = 0; j < intvls; ++j)
 		{
+			
 			RemoveOutlier<<<imgBlocks,1024>>>(pyDoG,minMax,idxmM,idxPyDoG, images[i].rows,images[i].cols,out_D);
 			//cudaMemcpy(out,out_D,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
 			
@@ -657,6 +668,9 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	/////////////////////////////////////////////////////////////////////Calculo de Orientaciones y magnitud en DoG
 	
 
+	
+	
+
 	ArrayImage * Mag;
 	ArrayImage * Ori;
 	
@@ -678,6 +692,7 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 
 		for (int j = 0; j < intvls; ++j)
 		{
+			
 			OriMag<<<imgBlocks,1024>>>(pyDoG,idxPyDoG, images[i].rows,images[i].cols,Mag,Ori,idxMagOri,MagAux,OriAux);
 			//cudaMemcpy(out,OriAux,sizeof(float)*sizeImage,cudaMemcpyDeviceToHost);
 			
@@ -704,7 +719,7 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////Obtener orientacion de keypoints
 
-	//vector<KeyPoint> KPoints;
+	vector<KeyPoint> KPoints;
 	
 	
 	idxmM=0;
@@ -717,13 +732,13 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 		
 		cudaMalloc(&KP,sizeof(keyPoint)*images[i].rows*images[i].cols); 
 		for (int j = 0; j < intvls; ++j)
-		{
-			KeyPoints<<<imgBlocks,1024>>>(Mag, Ori,  minMax , idxmM,  KP, sigma, images[i].rows,images[i].cols, i );
-			//cudaMemcpy(KP_host,KP,sizeof(keyPoint)*images[i].rows*images[i].cols,cudaMemcpyDeviceToHost);
+		{	
+			KeyPoints<<<imgBlocks,128>>>(Mag, Ori,  minMax , idxmM,  KP, sigma, images[i].rows,images[i].cols, i );
+		//	cudaMemcpy(KP_host,KP,sizeof(keyPoint)*images[i].rows*images[i].cols,cudaMemcpyDeviceToHost);
 
 			sigma= pow(2.0,1.0/ intvls ) * sigma;
 			++idxmM;
-			/*
+		/*	
 			
 			
 			for(int k=0; k<(images[i].rows*images[i].cols); ++k){
@@ -748,7 +763,8 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	}
 
 	cudaEventRecord(stop, 0);
- 	cudaEventSynchronize(stop);
+	cudaEventSynchronize(stop);
+	
  
  	float elapsedTime;
  	cudaEventElapsedTime(&elapsedTime,start, stop);
@@ -760,12 +776,12 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 
  	//cout<<KPoints.size()<<endl;
  	
- 	
+ 	/*
 	Mat out;
-	//drawKeypoints(I,KPoints,out);
-	//imshow("Puntos Caracteristicos SIFT",out);
-    //waitKey(0);
-    //destroyAllWindows();
+	drawKeypoints(I,KPoints,out);
+	imshow("Puntos Caracteristicos SIFT",out);
+    waitKey(0);
+    destroyAllWindows();
 
 
     /*Ptr<DescriptorExtractor> featureExtractor = DescriptorExtractor::create("SIFT");
@@ -788,7 +804,7 @@ float SiftFeatures(Mat Image, vector<Mat> PyDoG,Mat I){
 	cudaFree(pyDoG);
 	cudaFree(minMax);
 
-	return elapsedTime;
+	return 0;
 }
 
 
